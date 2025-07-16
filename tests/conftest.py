@@ -214,8 +214,33 @@ def create_test_file():
         else:
             file_path.write_bytes(content)
         return file_path
-    
+
     return _create_file
+
+
+@pytest.fixture
+def test_pdfs_dir() -> Path:
+    """Get the test PDFs directory."""
+    return Path(__file__).parent.parent / "test_pdfs"
+
+
+@pytest.fixture
+def sample_pdf_files(test_pdfs_dir: Path) -> list[Path]:
+    """Get list of sample PDF files for testing."""
+    pdf_files = list(test_pdfs_dir.glob("*.pdf"))
+    if not pdf_files:
+        pytest.skip("No PDF files found in test_pdfs directory")
+    return pdf_files
+
+
+@pytest.fixture
+def small_pdf_file(sample_pdf_files: list[Path]) -> Path:
+    """Get a small PDF file for testing."""
+    # Return the first PDF file, or create a minimal one if none exist
+    if sample_pdf_files:
+        return sample_pdf_files[0]
+    else:
+        pytest.skip("No PDF files available for testing")
 
 
 # Async mock helpers

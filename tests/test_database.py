@@ -1,0 +1,272 @@
+"""Tests for database operations."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+import pytest
+
+from doceater.database import DatabaseManager
+from doceater.models import Document, DocumentMetadata, DocumentStatus, LogLevel, ProcessingLog
+
+
+class TestDatabaseManager:
+    """Test DatabaseManager operations."""
+
+    @pytest.mark.asyncio
+    async def test_create_and_drop_tables(self, test_db_manager: DatabaseManager):
+        """Test creating and dropping database tables."""
+        # Tables should already be created by the fixture
+        # Test that we can drop and recreate them
+        await test_db_manager.drop_tables()
+        await test_db_manager.create_tables()
+
+        # Verify tables exist by trying to query them
+        from sqlalchemy import text
+        async with test_db_manager.get_session() as session:
+            # This should not raise an error if tables exist
+            result = await session.execute(text("SELECT COUNT(*) FROM documents"))
+            assert result.scalar() == 0
+
+    @pytest.mark.asyncio
+    async def test_create_document(self, test_db_manager: DatabaseManager):
+        """Test creating a document."""
+        doc = await test_db_manager.create_document(
+            file_path="/test/path/document.pdf",
+            filename="document.pdf",
+            content_hash="abc123",
+            file_size=1024,
+            mime_type="application/pdf",
+        )
+
+        assert isinstance(doc, Document)
+        assert isinstance(doc.id, uuid.UUID)
+
+        # Verify document properties
+        assert doc.file_path == "/test/path/document.pdf"
+        assert doc.filename == "document.pdf"
+        assert doc.content_hash == "abc123"
+        assert doc.file_size == 1024
+        assert doc.mime_type == "application/pdf"
+        assert doc.status == DocumentStatus.PENDING
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_path(self, test_db_manager: DatabaseManager):
+        """Test getting document by file path."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/unique/path.pdf",
+            filename="path.pdf",
+            content_hash="unique123",
+            file_size=2048,
+        )
+
+        # Get by path
+        doc = await test_db_manager.get_document_by_path("/test/unique/path.pdf")
+        assert doc is not None
+        assert doc.id == created_doc.id
+        assert doc.filename == "path.pdf"
+
+        # Test non-existent path
+        doc = await test_db_manager.get_document_by_path("/non/existent/path.pdf")
+        assert doc is None
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_hash(self, test_db_manager: DatabaseManager):
+        """Test getting document by content hash."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/hash/test.pdf",
+            filename="test.pdf",
+            content_hash="uniquehash123",
+            file_size=1024,
+        )
+
+        # Get by hash
+        doc = await test_db_manager.get_document_by_hash("uniquehash123")
+        assert doc is not None
+        assert doc.id == created_doc.id
+        assert doc.content_hash == "uniquehash123"
+
+        # Test non-existent hash
+        doc = await test_db_manager.get_document_by_hash("nonexistenthash")
+        assert doc is None
+
+    @pytest.mark.asyncio
+    async def test_update_document_content(self, test_db_manager: DatabaseManager):
+        """Test updating document content and status."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/update/doc.pdf",
+            filename="doc.pdf",
+            content_hash="update123",
+            file_size=1024,
+        )
+
+        # Update content
+        markdown_content = "# Updated Document\n\nThis is updated content."
+        await test_db_manager.update_document_content(
+            created_doc.id,
+            markdown_content,
+            DocumentStatus.COMPLETED,
+        )
+
+        # Verify update
+        doc = await test_db_manager.get_document_by_id(created_doc.id)
+        assert doc is not None
+        assert doc.markdown_content == markdown_content
+        assert doc.status == DocumentStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_update_document_status(self, test_db_manager: DatabaseManager):
+        """Test updating document status."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/status/doc.pdf",
+            filename="doc.pdf",
+            content_hash="status123",
+            file_size=1024,
+        )
+
+        # Update status to processing
+        await test_db_manager.update_document_status(created_doc.id, DocumentStatus.PROCESSING)
+
+        doc = await test_db_manager.get_document_by_id(created_doc.id)
+        assert doc is not None
+        assert doc.status == DocumentStatus.PROCESSING
+
+        # Update status to failed
+        await test_db_manager.update_document_status(created_doc.id, DocumentStatus.FAILED)
+
+        doc = await test_db_manager.get_document_by_id(created_doc.id)
+        assert doc is not None
+        assert doc.status == DocumentStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_list_documents(self, test_db_manager: DatabaseManager):
+        """Test listing documents with filters."""
+        # Create multiple documents with different statuses
+        doc1 = await test_db_manager.create_document(
+            file_path="/test/list/doc1.pdf",
+            filename="doc1.pdf",
+            content_hash="list1",
+            file_size=1024,
+        )
+
+        doc2 = await test_db_manager.create_document(
+            file_path="/test/list/doc2.pdf",
+            filename="doc2.pdf",
+            content_hash="list2",
+            file_size=2048,
+        )
+        
+        # Update one to completed
+        await test_db_manager.update_document_status(doc2.id, DocumentStatus.COMPLETED)
+
+        # List all documents
+        all_docs = await test_db_manager.list_documents()
+        assert len(all_docs) >= 2
+
+        # List only pending documents
+        pending_docs = await test_db_manager.list_documents(status=DocumentStatus.PENDING)
+        pending_ids = [doc.id for doc in pending_docs]
+        assert doc1.id in pending_ids
+        assert doc2.id not in pending_ids
+
+        # List only completed documents
+        completed_docs = await test_db_manager.list_documents(status=DocumentStatus.COMPLETED)
+        completed_ids = [doc.id for doc in completed_docs]
+        assert doc2.id in completed_ids
+        assert doc1.id not in completed_ids
+        
+        # Test limit
+        limited_docs = await test_db_manager.list_documents(limit=1)
+        assert len(limited_docs) == 1
+
+    @pytest.mark.asyncio
+    async def test_document_exists_after_creation(self, test_db_manager: DatabaseManager):
+        """Test that a document exists after creation and can be retrieved."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/exists/doc.pdf",
+            filename="doc.pdf",
+            content_hash="exists123",
+            file_size=1024,
+        )
+
+        # Verify it exists by ID
+        doc = await test_db_manager.get_document_by_id(created_doc.id)
+        assert doc is not None
+        assert doc.id == created_doc.id
+        assert doc.filename == "doc.pdf"
+
+        # Verify it exists by path
+        doc_by_path = await test_db_manager.get_document_by_path("/test/exists/doc.pdf")
+        assert doc_by_path is not None
+        assert doc_by_path.id == created_doc.id
+
+    @pytest.mark.asyncio
+    async def test_add_document_metadata(self, test_db_manager: DatabaseManager):
+        """Test adding document metadata."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/metadata/doc.pdf",
+            filename="doc.pdf",
+            content_hash="meta123",
+            file_size=1024,
+        )
+
+        # Add metadata - this should not raise an error
+        metadata = {
+            "title": "Test Document",
+            "author": "Test Author",
+            "subject": "Testing",
+            "keywords": "test, metadata",
+        }
+        await test_db_manager.add_document_metadata(created_doc.id, metadata)
+
+        # Add more metadata - this should also work
+        additional_metadata = {
+            "title": "Updated Test Document",  # This should update existing
+            "new_field": "New Value",  # This should add new
+        }
+        await test_db_manager.add_document_metadata(created_doc.id, additional_metadata)
+
+        # Test that the method completes without error
+        # (We can't test retrieval since get_document_metadata doesn't exist yet)
+
+    @pytest.mark.asyncio
+    async def test_log_processing(self, test_db_manager: DatabaseManager):
+        """Test logging processing events."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/log/doc.pdf",
+            filename="doc.pdf",
+            content_hash="log123",
+            file_size=1024,
+        )
+
+        # Log processing events - these should not raise errors
+        await test_db_manager.log_processing(
+            LogLevel.INFO,
+            "Processing started",
+            created_doc.id,
+            {"file_size": 1024},
+        )
+
+        await test_db_manager.log_processing(
+            LogLevel.WARNING,
+            "Minor issue encountered",
+            created_doc.id,
+        )
+
+        await test_db_manager.log_processing(
+            LogLevel.ERROR,
+            "System error",
+            None,  # System-level error
+            {"error_code": 500},
+        )
+
+        # Test that all log_processing calls complete without error
+        # (We can't test retrieval since get_processing_logs doesn't exist yet)
