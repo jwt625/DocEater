@@ -217,7 +217,7 @@ class TestDatabaseManager:
             file_size=1024,
         )
 
-        # Add metadata - this should not raise an error
+        # Add metadata
         metadata = {
             "title": "Test Document",
             "author": "Test Author",
@@ -226,15 +226,42 @@ class TestDatabaseManager:
         }
         await test_db_manager.add_document_metadata(created_doc.id, metadata)
 
-        # Add more metadata - this should also work
+        # Verify metadata was stored correctly
+        stored_metadata = await test_db_manager.get_document_metadata(created_doc.id)
+        assert stored_metadata == metadata
+
+        # Add more metadata
         additional_metadata = {
             "title": "Updated Test Document",  # This should update existing
             "new_field": "New Value",  # This should add new
         }
         await test_db_manager.add_document_metadata(created_doc.id, additional_metadata)
 
-        # Test that the method completes without error
-        # (We can't test retrieval since get_document_metadata doesn't exist yet)
+        # Verify all metadata is present
+        all_metadata = await test_db_manager.get_document_metadata(created_doc.id)
+        expected_metadata = {
+            "title": "Updated Test Document",  # Should be updated
+            "author": "Test Author",  # Should remain
+            "subject": "Testing",  # Should remain
+            "keywords": "test, metadata",  # Should remain
+            "new_field": "New Value",  # Should be added
+        }
+        assert all_metadata == expected_metadata
+
+    @pytest.mark.asyncio
+    async def test_get_document_metadata_empty(self, test_db_manager: DatabaseManager):
+        """Test getting metadata for document with no metadata."""
+        # Create a document
+        created_doc = await test_db_manager.create_document(
+            file_path="/test/empty_metadata/doc.pdf",
+            filename="doc.pdf",
+            content_hash="empty123",
+            file_size=1024,
+        )
+
+        # Get metadata for document with no metadata
+        metadata = await test_db_manager.get_document_metadata(created_doc.id)
+        assert metadata == {}
 
     @pytest.mark.asyncio
     async def test_log_processing(self, test_db_manager: DatabaseManager):
@@ -247,7 +274,7 @@ class TestDatabaseManager:
             file_size=1024,
         )
 
-        # Log processing events - these should not raise errors
+        # Log processing events
         await test_db_manager.log_processing(
             LogLevel.INFO,
             "Processing started",
@@ -268,5 +295,24 @@ class TestDatabaseManager:
             {"error_code": 500},
         )
 
-        # Test that all log_processing calls complete without error
-        # (We can't test retrieval since get_processing_logs doesn't exist yet)
+        # Verify logs were stored correctly
+        all_logs = await test_db_manager.get_processing_logs()
+        assert len(all_logs) == 3
+
+        # Check document-specific logs
+        doc_logs = await test_db_manager.get_processing_logs(document_id=created_doc.id)
+        assert len(doc_logs) == 2
+
+        # Check logs by level
+        error_logs = await test_db_manager.get_processing_logs(level=LogLevel.ERROR)
+        assert len(error_logs) == 1
+        assert error_logs[0].message == "System error"
+        assert error_logs[0].details == {"error_code": 500}
+
+        # Check specific log content
+        info_logs = await test_db_manager.get_processing_logs(
+            document_id=created_doc.id, level=LogLevel.INFO
+        )
+        assert len(info_logs) == 1
+        assert info_logs[0].message == "Processing started"
+        assert info_logs[0].details == {"file_size": 1024}

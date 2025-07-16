@@ -39,20 +39,30 @@ class DatabaseManager:
     def engine(self) -> AsyncEngine:
         """Get or create the database engine."""
         if self._engine is None:
-            # Convert postgresql:// to postgresql+asyncpg://
             db_url = self.settings.database_url
+
+            # Handle PostgreSQL URL conversion
             if db_url.startswith("postgresql://"):
                 db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-            elif not db_url.startswith("postgresql+asyncpg://"):
-                db_url = f"postgresql+asyncpg://{db_url}"
+            elif db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            # For SQLite URLs, keep them as-is (sqlite+aiosqlite:// or sqlite://)
+            # For other databases, assume they're already properly formatted
 
-            self._engine = create_async_engine(
-                db_url,
-                echo=self.settings.log_level == "DEBUG",
-                pool_size=10,
-                max_overflow=20,
-                pool_pre_ping=True,
-            )
+            # Configure engine parameters based on database type
+            engine_kwargs = {
+                "echo": self.settings.log_level == "DEBUG",
+                "pool_pre_ping": True,
+            }
+
+            # Only add PostgreSQL-specific pool settings for PostgreSQL
+            if "postgresql" in db_url:
+                engine_kwargs.update({
+                    "pool_size": 10,
+                    "max_overflow": 20,
+                })
+
+            self._engine = create_async_engine(db_url, **engine_kwargs)
         return self._engine
 
     @property
@@ -217,6 +227,20 @@ class DatabaseManager:
 
         logger.debug(f"Added metadata to document: {document_id}")
 
+    async def get_document_metadata(
+        self, document_id: uuid.UUID
+    ) -> dict[str, str]:
+        """Get all metadata for a document."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(DocumentMetadata).where(
+                    DocumentMetadata.document_id == document_id
+                )
+            )
+            metadata_entries = result.scalars().all()
+
+            return {entry.key: entry.value for entry in metadata_entries}
+
     # Logging operations
     async def log_processing(
         self,
@@ -239,6 +263,27 @@ class DatabaseManager:
         # Also log to application logger
         log_func = getattr(logger, level.value.lower())
         log_func(f"[{document_id or 'SYSTEM'}] {message}")
+
+    async def get_processing_logs(
+        self,
+        document_id: uuid.UUID | None = None,
+        level: LogLevel | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Sequence[ProcessingLog]:
+        """Get processing logs with optional filtering."""
+        async with self.get_session() as session:
+            query = select(ProcessingLog).order_by(ProcessingLog.created_at.desc())
+
+            if document_id:
+                query = query.where(ProcessingLog.document_id == document_id)
+
+            if level:
+                query = query.where(ProcessingLog.level == level)
+
+            query = query.limit(limit).offset(offset)
+            result = await session.execute(query)
+            return result.scalars().all()
 
 
 # Global database manager instance

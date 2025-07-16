@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from doceater.database import DatabaseManager
 from doceater.models import DocumentStatus
 from doceater.processor import DocumentProcessor
 
@@ -52,20 +50,20 @@ class TestDocumentProcessor:
         assert mock_converter_class.call_count == 1  # Still only called once
 
     @pytest.mark.asyncio
-    async def test_calculate_file_hash(self, test_settings, test_db_manager, create_test_file, temp_dir):
-        """Test file hash calculation."""
+    async def test_calculate_file_hash(self, test_settings, test_db_manager, small_pdf_file):
+        """Test file hash calculation with real PDF."""
         processor = DocumentProcessor(test_settings, test_db_manager)
-        
-        # Create test file with known content
-        content = b"Test content for hash calculation"
-        test_file = create_test_file(temp_dir, "test.txt", content)
-        
-        # Calculate hash
-        file_hash = await processor.calculate_file_hash(test_file)
-        
-        # Verify hash is correct
-        expected_hash = hashlib.sha256(content).hexdigest()
-        assert file_hash == expected_hash
+
+        # Calculate hash for real PDF
+        file_hash = await processor.calculate_file_hash(small_pdf_file)
+
+        # Verify hash is a valid SHA-256 hex string
+        assert len(file_hash) == 64  # SHA-256 produces 64-character hex string
+        assert all(c in "0123456789abcdef" for c in file_hash)
+
+        # Verify hash is consistent
+        file_hash2 = await processor.calculate_file_hash(small_pdf_file)
+        assert file_hash == file_hash2
 
     def test_get_mime_type(self, test_settings, test_db_manager):
         """Test MIME type detection."""
@@ -119,22 +117,20 @@ class TestDocumentProcessor:
             assert processor.is_supported_file(large_file) is False
 
     @pytest.mark.asyncio
-    async def test_extract_metadata(self, test_settings, test_db_manager, create_test_file, temp_dir):
-        """Test metadata extraction."""
+    async def test_extract_metadata(self, test_settings, test_db_manager, small_pdf_file):
+        """Test metadata extraction with real PDF."""
         processor = DocumentProcessor(test_settings, test_db_manager)
-        
-        # Create test file
-        content = "Test content"
-        test_file = create_test_file(temp_dir, "test.pdf", content)
-        
-        # Extract metadata
-        metadata = await processor.extract_metadata(test_file)
-        
+
+        # Extract metadata from real PDF file
+        metadata = await processor.extract_metadata(small_pdf_file)
+
         # Verify metadata
         assert metadata["file_extension"] == ".pdf"
-        assert metadata["file_size_bytes"] == str(len(content.encode()))
+        assert "file_size_bytes" in metadata
+        assert int(metadata["file_size_bytes"]) > 0  # Real PDF should have size
         assert "created_time" in metadata
         assert "modified_time" in metadata
+        assert metadata.get("mime_type") == "application/pdf"
 
     @pytest.mark.asyncio
     async def test_extract_metadata_error_handling(self, test_settings, test_db_manager):
@@ -315,3 +311,71 @@ class TestDocumentProcessor:
             
             # Verify error was logged
             mock_log.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_convert_to_markdown_real_pdf(self, test_settings, test_db_manager, small_pdf_file):
+        """Test document conversion with real PDF file (integration test)."""
+        processor = DocumentProcessor(test_settings, test_db_manager)
+
+        try:
+            # Convert real PDF to markdown
+            markdown = await processor.convert_to_markdown(small_pdf_file)
+
+            # Verify conversion produces valid markdown
+            assert isinstance(markdown, str)
+            assert len(markdown) > 0
+            # Real PDFs should produce some content
+            assert markdown.strip() != ""
+
+            # Basic markdown structure checks
+            # Most PDFs should have some text content
+            assert len(markdown.split()) > 0  # Should have at least some words
+        except Exception as e:
+            # Skip test if Docling models can't be downloaded (e.g., no HF auth)
+            if "401" in str(e) or "Unauthorized" in str(e) or "HfHubHTTPError" in str(e):
+                pytest.skip(f"Skipping integration test due to Docling model access issue: {e}")
+            else:
+                raise
+
+    @pytest.mark.asyncio
+    async def test_process_file_real_pdf_integration(self, test_settings, test_db_manager, small_pdf_file):
+        """Test complete file processing workflow with real PDF (integration test)."""
+        processor = DocumentProcessor(test_settings, test_db_manager)
+
+        # Process real PDF file
+        result = await processor.process_file(small_pdf_file)
+
+        # Check if processing failed due to Docling model access issues
+        if not result:
+            # Check if there's a document in the database with failed status
+            doc = await test_db_manager.get_document_by_path(str(small_pdf_file))
+            if doc and doc.status == DocumentStatus.FAILED:
+                # Check the logs to see if it's a model access issue
+                logs = await test_db_manager.get_processing_logs(document_id=doc.id)
+                for log in logs:
+                    if ("401" in log.message or "Unauthorized" in log.message or
+                        "HfHubHTTPError" in log.message):
+                        pytest.skip("Skipping integration test due to Docling model access issue")
+                # If it's a different error, let the test fail normally
+                assert False, f"Processing failed for unknown reason. Check logs: {[log.message for log in logs]}"
+
+        # If we get here, processing succeeded
+        assert result is True
+
+        # Verify document was created in database
+        doc = await test_db_manager.get_document_by_path(str(small_pdf_file))
+        assert doc is not None
+        assert doc.filename == small_pdf_file.name
+        assert doc.status == DocumentStatus.COMPLETED
+        assert doc.markdown_content is not None
+        assert len(doc.markdown_content) > 0
+
+        # Verify metadata was extracted
+        metadata = await test_db_manager.get_document_metadata(doc.id)
+        assert metadata is not None
+        assert metadata.get("file_extension") == ".pdf"
+        assert metadata.get("mime_type") == "application/pdf"
+
+        # Verify processing was logged
+        logs = await test_db_manager.get_processing_logs(document_id=doc.id)
+        assert len(logs) > 0

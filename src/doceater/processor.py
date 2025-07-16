@@ -33,21 +33,9 @@ class DocumentProcessor:
     def converter(self) -> DocumentConverter:
         """Get or create the Docling converter."""
         if self._converter is None:
-            # Configure pipeline options for formula enrichment
-            pipeline_options = PdfPipelineOptions()
-            pipeline_options.do_ocr = True
-            pipeline_options.do_table_structure = True
-
-            # Enable formula enrichment if configured
-            if self.settings.docling_enrich_formula:
-                pipeline_options.artifacts_path = None  # Use default
-
-            self._converter = DocumentConverter(
-                format_options={
-                    InputFormat.PDF: pipeline_options,
-                }
-            )
-            logger.info("Initialized Docling converter with formula enrichment")
+            # Use default configuration for now to avoid compatibility issues
+            self._converter = DocumentConverter()
+            logger.info("Initialized Docling converter")
 
         return self._converter
 

@@ -41,7 +41,7 @@ def test_settings(temp_dir: Path) -> Settings:
         database_url="sqlite+aiosqlite:///:memory:",
         watch_folder=str(temp_dir),
         watch_recursive=True,
-        max_file_size_mb=10,
+        max_file_size_mb=50,  # Increased to handle larger test PDFs
         supported_extensions=[".pdf", ".txt"],
         exclude_patterns=[".*", "~*", "*.tmp"],
         docling_enrich_formula=True,
@@ -95,64 +95,7 @@ async def test_db_manager(test_settings: Settings, test_engine: AsyncEngine) -> 
     await db_manager.close()
 
 
-@pytest.fixture
-def sample_pdf_content() -> bytes:
-    """Create sample PDF content for testing."""
-    # This is a minimal PDF content for testing
-    # In real tests, you might want to use a proper PDF library
-    return b"""%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
 
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
->>
-endobj
-
-4 0 obj
-<<
-/Length 44
->>
-stream
-BT
-/F1 12 Tf
-72 720 Td
-(Test PDF content) Tj
-ET
-endstream
-endobj
-
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000204 00000 n 
-trailer
-<<
-/Size 5
-/Root 1 0 R
->>
-startxref
-297
-%%EOF"""
 
 
 @pytest.fixture
@@ -236,11 +179,13 @@ def sample_pdf_files(test_pdfs_dir: Path) -> list[Path]:
 @pytest.fixture
 def small_pdf_file(sample_pdf_files: list[Path]) -> Path:
     """Get a small PDF file for testing."""
-    # Return the first PDF file, or create a minimal one if none exist
-    if sample_pdf_files:
-        return sample_pdf_files[0]
-    else:
+    if not sample_pdf_files:
         pytest.skip("No PDF files available for testing")
+
+    # Sort by file size and return the smallest one
+    pdf_files_with_size = [(f, f.stat().st_size) for f in sample_pdf_files]
+    pdf_files_with_size.sort(key=lambda x: x[1])  # Sort by size
+    return pdf_files_with_size[0][0]  # Return the smallest file
 
 
 # Async mock helpers
@@ -253,8 +198,8 @@ class AsyncMockContext:
     async def __aenter__(self):
         return self.return_value
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+    async def __aexit__(self, *_):
+        return None
 
 
 def create_async_mock(**kwargs) -> AsyncMock:
