@@ -166,6 +166,9 @@ cython_debug/
 *.pid
 .doceater/
 
+# External dependencies
+external/
+
 # Test files
 test_files/
 sample_docs/
