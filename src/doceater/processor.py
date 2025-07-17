@@ -7,13 +7,11 @@ import mimetypes
 from pathlib import Path
 
 import aiofiles
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.document_converter import DocumentConverter
 from loguru import logger
 
 from .config import Settings, get_settings
 from .database import DatabaseManager, get_db_manager
+from .docling_wrapper import DoclingWrapper
 from .models import DocumentStatus, LogLevel
 
 
@@ -24,20 +22,23 @@ class DocumentProcessor:
         self,
         settings: Settings | None = None,
         db_manager: DatabaseManager | None = None,
+        enable_formula_enrichment: bool = True,
     ) -> None:
         self.settings = settings or get_settings()
         self.db_manager = db_manager or get_db_manager()
-        self._converter: DocumentConverter | None = None
+        self._docling_wrapper: DoclingWrapper | None = None
+        self.enable_formula_enrichment = enable_formula_enrichment
 
     @property
-    def converter(self) -> DocumentConverter:
-        """Get or create the Docling converter."""
-        if self._converter is None:
-            # Use default configuration for now to avoid compatibility issues
-            self._converter = DocumentConverter()
-            logger.info("Initialized Docling converter")
+    def docling_wrapper(self) -> DoclingWrapper:
+        """Get or create the Docling wrapper."""
+        if self._docling_wrapper is None:
+            self._docling_wrapper = DoclingWrapper(
+                enable_formula_enrichment=self.enable_formula_enrichment
+            )
+            logger.info("Initialized Docling wrapper with enhanced configuration")
 
-        return self._converter
+        return self._docling_wrapper
 
     async def calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file."""
@@ -100,15 +101,12 @@ class DocumentProcessor:
             return {}
 
     async def convert_to_markdown(self, file_path: Path) -> str:
-        """Convert document to Markdown using Docling."""
+        """Convert document to Markdown using Docling with enhanced configuration."""
         try:
             logger.info(f"Converting document to Markdown: {file_path}")
 
-            # Convert document
-            result = self.converter.convert(str(file_path))
-
-            # Extract markdown content
-            markdown_content = result.document.export_to_markdown()
+            # Use the wrapper to convert with enhanced configuration
+            markdown_content = self.docling_wrapper.convert_to_markdown(file_path)
 
             logger.info(f"Successfully converted document: {file_path}")
             return markdown_content

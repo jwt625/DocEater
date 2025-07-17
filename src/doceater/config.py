@@ -41,7 +41,10 @@ class Settings(BaseSettings):
         description="Maximum file size to process in MB"
     )
     supported_extensions: list[str] = Field(
-        default_factory=lambda: [".pdf"],  # MVP: PDF only
+        default_factory=lambda: [
+            ".pdf", ".docx", ".pptx", ".html", ".md",
+            ".xlsx", ".csv", ".xml"
+        ],  # Actual Docling-supported formats
         description="Supported file extensions"
     )
     exclude_patterns: list[str] = Field(

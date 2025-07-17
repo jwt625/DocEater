@@ -23,7 +23,10 @@ class TestSettings:
         assert settings.watch_folder == str(Path.home() / "Downloads")
         assert settings.watch_recursive is True
         assert settings.max_file_size_mb == 100
-        assert settings.supported_extensions == [".pdf"]
+        assert settings.supported_extensions == [
+            ".pdf", ".docx", ".pptx", ".html", ".md",
+            ".xlsx", ".csv", ".xml"
+        ]
         assert settings.exclude_patterns == [".*", "~*", "*.tmp", "*.temp"]
         assert settings.docling_enrich_formula is True
         assert settings.max_concurrent_files == 3

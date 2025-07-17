@@ -25,7 +25,7 @@ dependencies = [
 
     # File watching and processing
     "watchdog>=4.0.0",
-    "docling>=2.0.0",
+    # Note: docling is installed locally from external/docling
 
     # Database (no embeddings in MVP)
     "asyncpg>=0.29.0",

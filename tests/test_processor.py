@@ -21,7 +21,7 @@ class TestDocumentProcessor:
         
         assert processor.settings == test_settings
         assert processor.db_manager == test_db_manager
-        assert processor._converter is None
+        assert processor._docling_wrapper is None
 
     def test_processor_initialization_with_defaults(self):
         """Test DocumentProcessor initialization with default dependencies."""
@@ -29,25 +29,25 @@ class TestDocumentProcessor:
         
         assert processor.settings is not None
         assert processor.db_manager is not None
-        assert processor._converter is None
+        assert processor._docling_wrapper is None
 
-    @patch('doceater.processor.DocumentConverter')
-    def test_converter_property(self, mock_converter_class, test_settings, test_db_manager):
-        """Test converter property creates and caches converter."""
-        mock_converter = MagicMock()
-        mock_converter_class.return_value = mock_converter
-        
+    @patch('doceater.processor.DoclingWrapper')
+    def test_docling_wrapper_property(self, mock_wrapper_class, test_settings, test_db_manager):
+        """Test docling_wrapper property creates and caches wrapper."""
+        mock_wrapper = MagicMock()
+        mock_wrapper_class.return_value = mock_wrapper
+
         processor = DocumentProcessor(test_settings, test_db_manager)
-        
-        # First access should create converter
-        converter1 = processor.converter
-        assert converter1 == mock_converter
-        mock_converter_class.assert_called_once()
-        
-        # Second access should return cached converter
-        converter2 = processor.converter
-        assert converter2 == mock_converter
-        assert mock_converter_class.call_count == 1  # Still only called once
+
+        # First access should create wrapper
+        wrapper1 = processor.docling_wrapper
+        assert wrapper1 == mock_wrapper
+        mock_wrapper_class.assert_called_once_with(enable_formula_enrichment=True)
+
+        # Second access should return cached wrapper
+        wrapper2 = processor.docling_wrapper
+        assert wrapper2 == mock_wrapper
+        assert mock_wrapper_class.call_count == 1  # Still only called once
 
     @pytest.mark.asyncio
     async def test_calculate_file_hash(self, test_settings, test_db_manager, small_pdf_file):
@@ -145,45 +145,40 @@ class TestDocumentProcessor:
         assert metadata == {}
 
     @pytest.mark.asyncio
-    @patch('doceater.processor.DocumentConverter')
-    async def test_convert_to_markdown(self, mock_converter_class, test_settings, test_db_manager, create_test_file, temp_dir):
+    @patch('doceater.processor.DoclingWrapper')
+    async def test_convert_to_markdown(self, mock_wrapper_class, test_settings, test_db_manager, create_test_file, temp_dir):
         """Test document conversion to Markdown."""
-        # Setup mock converter
-        mock_converter = MagicMock()
-        mock_result = MagicMock()
-        mock_document = MagicMock()
-        mock_document.export_to_markdown.return_value = "# Test Document\n\nConverted content"
-        mock_result.document = mock_document
-        mock_converter.convert.return_value = mock_result
-        mock_converter_class.return_value = mock_converter
-        
+        # Setup mock wrapper
+        mock_wrapper = MagicMock()
+        mock_wrapper.convert_to_markdown.return_value = "# Test Document\n\nConverted content"
+        mock_wrapper_class.return_value = mock_wrapper
+
         processor = DocumentProcessor(test_settings, test_db_manager)
-        
+
         # Create test file
         test_file = create_test_file(temp_dir, "test.pdf", b"PDF content")
-        
+
         # Convert to markdown
         markdown = await processor.convert_to_markdown(test_file)
-        
+
         # Verify conversion
         assert markdown == "# Test Document\n\nConverted content"
-        mock_converter.convert.assert_called_once_with(str(test_file))
-        mock_document.export_to_markdown.assert_called_once()
+        mock_wrapper.convert_to_markdown.assert_called_once_with(test_file)
 
     @pytest.mark.asyncio
-    @patch('doceater.processor.DocumentConverter')
-    async def test_convert_to_markdown_error(self, mock_converter_class, test_settings, test_db_manager, create_test_file, temp_dir):
+    @patch('doceater.processor.DoclingWrapper')
+    async def test_convert_to_markdown_error(self, mock_wrapper_class, test_settings, test_db_manager, create_test_file, temp_dir):
         """Test document conversion error handling."""
-        # Setup mock converter to raise error
-        mock_converter = MagicMock()
-        mock_converter.convert.side_effect = Exception("Conversion failed")
-        mock_converter_class.return_value = mock_converter
-        
+        # Setup mock wrapper to raise error
+        mock_wrapper = MagicMock()
+        mock_wrapper.convert_to_markdown.side_effect = Exception("Conversion failed")
+        mock_wrapper_class.return_value = mock_wrapper
+
         processor = DocumentProcessor(test_settings, test_db_manager)
-        
+
         # Create test file
         test_file = create_test_file(temp_dir, "test.pdf", b"PDF content")
-        
+
         # Conversion should raise exception
         with pytest.raises(Exception, match="Conversion failed"):
             await processor.convert_to_markdown(test_file)
@@ -224,17 +219,13 @@ class TestDocumentProcessor:
             mock_get_by_hash.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('doceater.processor.DocumentConverter')
-    async def test_process_file_success(self, mock_converter_class, test_settings, test_db_manager, create_test_file, temp_dir):
+    @patch('doceater.processor.DoclingWrapper')
+    async def test_process_file_success(self, mock_wrapper_class, test_settings, test_db_manager, create_test_file, temp_dir):
         """Test successful file processing."""
-        # Setup mock converter
-        mock_converter = MagicMock()
-        mock_result = MagicMock()
-        mock_document = MagicMock()
-        mock_document.export_to_markdown.return_value = "# Test Document\n\nContent"
-        mock_result.document = mock_document
-        mock_converter.convert.return_value = mock_result
-        mock_converter_class.return_value = mock_converter
+        # Setup mock wrapper
+        mock_wrapper = MagicMock()
+        mock_wrapper.convert_to_markdown.return_value = "# Test Document\n\nContent"
+        mock_wrapper_class.return_value = mock_wrapper
         
         processor = DocumentProcessor(test_settings, test_db_manager)
         
@@ -272,13 +263,13 @@ class TestDocumentProcessor:
             assert mock_log.call_count >= 1
 
     @pytest.mark.asyncio
-    @patch('doceater.processor.DocumentConverter')
-    async def test_process_file_conversion_error(self, mock_converter_class, test_settings, test_db_manager, create_test_file, temp_dir):
+    @patch('doceater.processor.DoclingWrapper')
+    async def test_process_file_conversion_error(self, mock_wrapper_class, test_settings, test_db_manager, create_test_file, temp_dir):
         """Test file processing with conversion error."""
-        # Setup mock converter to fail
-        mock_converter = MagicMock()
-        mock_converter.convert.side_effect = Exception("Conversion failed")
-        mock_converter_class.return_value = mock_converter
+        # Setup mock wrapper to fail
+        mock_wrapper = MagicMock()
+        mock_wrapper.convert_to_markdown.side_effect = Exception("Conversion failed")
+        mock_wrapper_class.return_value = mock_wrapper
         
         processor = DocumentProcessor(test_settings, test_db_manager)
         

@@ -5,7 +5,7 @@ A background service that watches folders for new files, converts them to Markdo
 ## Features
 
 - **Automatic File Monitoring**: Watches specified folders for new PDF files
-- **Document Conversion**: Converts PDFs to Markdown using Docling with formula enrichment
+- **Document Conversion**: Converts documents to Markdown using local Docling with formula enrichment
 - **Database Storage**: Stores documents and metadata in PostgreSQL
 - **CLI Interface**: Easy-to-use command-line interface for manual operations
 - **Error Handling**: Robust error handling with partial content recovery
@@ -152,9 +152,20 @@ See [RFD 002](docs/RFD-002-testing-infrastructure.md) for detailed testing infra
 The MVP consists of:
 
 - **File Watcher**: Monitors folders using watchdog
-- **Document Processor**: Converts files using Docling
+- **Document Processor**: Converts files using local Docling with enhanced configuration
 - **Database Layer**: PostgreSQL with async SQLAlchemy
 - **CLI Interface**: Typer-based command interface
+
+### Docling Integration
+
+DocEater uses a local installation of the official Docling library from https://github.com/DS4SD/docling with enhanced configuration:
+
+- **Formula Enrichment**: Enabled by default (`--enrich_formula`)
+- **Multiple Formats**: PDF, DOCX, PPTX, HTML, MD, TXT, XLSX, CSV, JSON, XML
+- **Enhanced Processing**: OCR, table structure detection, and mathematical formula processing
+- **Local Installation**: Cloned from official repository for latest features
+
+See [DOCLING_INTEGRATION.md](DOCLING_INTEGRATION.md) for detailed information.
 
 ## Roadmap
 
@@ -163,7 +174,7 @@ The MVP consists of:
 - [x] Comprehensive testing infrastructure (49 tests, 48% coverage)
 - [x] CLI interface with all planned commands
 - [x] Database operations with PostgreSQL support
-- [x] Document processing with Docling integration
+- [x] Document processing with local Docling integration and formula enrichment
 
 ### Planned 🚧
 - [ ] File watcher component tests
