@@ -58,6 +58,40 @@ class Settings(BaseSettings):
         description="Enable formula enrichment in Docling"
     )
 
+    # Image storage settings
+    images_enabled: bool = Field(
+        default=True,
+        description="Enable image extraction and storage"
+    )
+    images_base_path: str = Field(
+        default_factory=lambda: str(Path.home() / "doceater_data" / "images"),
+        description="Base directory for storing extracted images"
+    )
+    images_max_size_mb: int = Field(
+        default=50,
+        description="Maximum size per image in MB"
+    )
+    images_allowed_formats: list[str] = Field(
+        default_factory=lambda: ["PNG", "JPEG", "WEBP"],
+        description="Allowed image formats for storage"
+    )
+    images_compression_quality: int = Field(
+        default=85,
+        description="JPEG compression quality (1-100)"
+    )
+    images_organize_by_date: bool = Field(
+        default=True,
+        description="Organize images in date-based directory structure"
+    )
+    images_cleanup_failed: bool = Field(
+        default=True,
+        description="Automatically cleanup images from failed extractions"
+    )
+    images_retention_days: int = Field(
+        default=365,
+        description="Number of days to retain images (0 = forever)"
+    )
+
     # Processing settings
     max_concurrent_files: int = Field(
         default=3,
@@ -125,6 +159,54 @@ class Settings(BaseSettings):
         if v.upper() not in valid_levels:
             raise ValueError(f"log_level must be one of: {valid_levels}")
         return v.upper()
+
+    @field_validator("images_base_path")
+    @classmethod
+    def validate_images_base_path(cls, v: str) -> str:
+        """Ensure images base path is valid and create if needed."""
+        path = Path(v).expanduser().resolve()
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise ValueError(f"Cannot create images directory {path}: {e}")
+
+        if not path.is_dir():
+            raise ValueError(f"Images base path must be a directory: {path}")
+
+        return str(path)
+
+    @field_validator("images_max_size_mb")
+    @classmethod
+    def validate_images_max_size(cls, v: int) -> int:
+        """Ensure image max size is reasonable."""
+        if v <= 0:
+            raise ValueError("images_max_size_mb must be positive")
+        if v > 500:  # 500MB limit per image
+            raise ValueError("images_max_size_mb cannot exceed 500MB")
+        return v
+
+    @field_validator("images_compression_quality")
+    @classmethod
+    def validate_compression_quality(cls, v: int) -> int:
+        """Ensure compression quality is valid."""
+        if not 1 <= v <= 100:
+            raise ValueError("images_compression_quality must be between 1 and 100")
+        return v
+
+    @field_validator("images_retention_days")
+    @classmethod
+    def validate_retention_days(cls, v: int) -> int:
+        """Ensure retention days is reasonable."""
+        if v < 0:
+            raise ValueError("images_retention_days cannot be negative")
+        if v > 3650:  # 10 years max
+            raise ValueError("images_retention_days cannot exceed 3650 days")
+        return v
+
+    @property
+    def images_max_size_bytes(self) -> int:
+        """Get max image size in bytes."""
+        return self.images_max_size_mb * 1024 * 1024
 
     @property
     def max_file_size_bytes(self) -> int:

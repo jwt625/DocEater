@@ -13,12 +13,14 @@ __email__ = "team@doceater.dev"
 
 # Core exports for the MVP
 from .config import Settings, get_settings
-from .models import Document, DocumentMetadata, ProcessingLog
+from .models import Document, DocumentImage, DocumentMetadata, ImageType, ProcessingLog
 
 __all__ = [
     "Settings",
     "get_settings",
     "Document",
+    "DocumentImage",
     "DocumentMetadata",
+    "ImageType",
     "ProcessingLog",
 ]

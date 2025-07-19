@@ -12,6 +12,7 @@ from loguru import logger
 from .config import Settings, get_settings
 from .database import DatabaseManager, get_db_manager
 from .docling_wrapper import DoclingWrapper
+from .image_storage import ImageStorageManager
 from .models import DocumentStatus, LogLevel
 
 
@@ -23,9 +24,11 @@ class DocumentProcessor:
         settings: Settings | None = None,
         db_manager: DatabaseManager | None = None,
         enable_formula_enrichment: bool = True,
+        image_storage: ImageStorageManager | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.db_manager = db_manager or get_db_manager()
+        self.image_storage = image_storage or ImageStorageManager(self.settings)
         self._docling_wrapper: DoclingWrapper | None = None
         self.enable_formula_enrichment = enable_formula_enrichment
 
@@ -34,7 +37,8 @@ class DocumentProcessor:
         """Get or create the Docling wrapper."""
         if self._docling_wrapper is None:
             self._docling_wrapper = DoclingWrapper(
-                enable_formula_enrichment=self.enable_formula_enrichment
+                enable_formula_enrichment=self.enable_formula_enrichment,
+                enable_image_extraction=self.settings.images_enabled,
             )
             logger.info("Initialized Docling wrapper with enhanced configuration")
 
@@ -115,6 +119,27 @@ class DocumentProcessor:
             logger.error(f"Failed to convert document {file_path}: {e}")
             raise
 
+    async def convert_to_markdown_with_images(self, file_path: Path) -> tuple[str, list[Path]]:
+        """Convert document to markdown and extract images.
+
+        Args:
+            file_path: Path to the document to convert
+
+        Returns:
+            Tuple of (markdown_content, list_of_temp_image_paths)
+        """
+        try:
+            if self.settings.images_enabled:
+                # Use the enhanced method that extracts to temporary directory
+                return self.docling_wrapper.convert_to_markdown_with_storage(file_path)
+            else:
+                # Fall back to text-only conversion
+                markdown_content = await self.convert_to_markdown(file_path)
+                return markdown_content, []
+        except Exception as e:
+            logger.error(f"Failed to convert document with images {file_path}: {e}")
+            raise
+
     async def process_file(self, file_path: Path) -> bool:
         """Process a single file completely."""
         try:
@@ -154,8 +179,59 @@ class DocumentProcessor:
             )
 
             try:
-                # Convert to markdown
-                markdown_content = await self.convert_to_markdown(file_path)
+                # Convert to markdown with optional image extraction
+                if self.settings.images_enabled:
+                    markdown_content, temp_image_paths = await self.convert_to_markdown_with_images(file_path)
+
+                    # Store images persistently
+                    if temp_image_paths:
+                        try:
+                            stored_images = await self.image_storage.store_images(
+                                document.id, temp_image_paths
+                            )
+
+                            # Save image metadata to database
+                            for stored_image in stored_images:
+                                try:
+                                    await self.db_manager.create_document_image(
+                                        document_id=document.id,
+                                        image_path=str(stored_image.path),
+                                        filename=stored_image.filename,
+                                        image_type=stored_image.image_type,
+                                        image_index=stored_image.image_index,
+                                        file_size=stored_image.file_size,
+                                        width=stored_image.width,
+                                        height=stored_image.height,
+                                        format=stored_image.format,
+                                        extraction_method="docling",
+                                        quality_score=None,
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to save image metadata for {stored_image.filename}: {e}")
+                                    # Continue with other images
+
+                            logger.info(f"Stored {len(stored_images)} images for document {document.id}")
+
+                        except Exception as e:
+                            logger.error(f"Failed to store images for document {document.id}: {e}")
+                            # Continue processing without images
+                            stored_images = []
+
+                        # Clean up temporary images
+                        import shutil
+                        for temp_path in temp_image_paths:
+                            try:
+                                if temp_path.exists():
+                                    # Remove the temporary directory
+                                    temp_dir = temp_path.parent
+                                    if temp_dir.name.startswith("doceater_images_"):
+                                        shutil.rmtree(temp_dir, ignore_errors=True)
+                                    break  # Only need to remove the temp dir once
+                            except Exception as e:
+                                logger.warning(f"Failed to cleanup temporary image directory: {e}")
+                else:
+                    # Text-only conversion
+                    markdown_content = await self.convert_to_markdown(file_path)
 
                 # Update document with content
                 await self.db_manager.update_document_content(
@@ -169,12 +245,22 @@ class DocumentProcessor:
                 if metadata:
                     await self.db_manager.add_document_metadata(document.id, metadata)
 
-                # Log success
+                # Log success with image information
+                log_details = {
+                    "file_size": file_size,
+                    "content_length": len(markdown_content),
+                    "images_enabled": self.settings.images_enabled,
+                }
+
+                if self.settings.images_enabled and 'stored_images' in locals():
+                    log_details["images_extracted"] = len(stored_images)
+                    log_details["image_types"] = [img.image_type.value for img in stored_images]
+
                 await self.db_manager.log_processing(
                     LogLevel.INFO,
                     f"Successfully processed file: {file_path.name}",
                     document.id,
-                    {"file_size": file_size, "content_length": len(markdown_content)},
+                    log_details,
                 )
 
                 logger.info(f"Successfully processed file: {file_path}")
@@ -185,6 +271,14 @@ class DocumentProcessor:
                 await self.db_manager.update_document_status(
                     document.id, DocumentStatus.FAILED
                 )
+
+                # Cleanup any partially stored images on failure
+                if self.settings.images_enabled and self.settings.images_cleanup_failed:
+                    try:
+                        await self.image_storage.cleanup_document_images(document.id)
+                        logger.debug(f"Cleaned up images for failed document {document.id}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to cleanup images for failed document: {cleanup_error}")
 
                 # Log error with partial content recovery attempt
                 error_details = {"error": str(e), "error_type": type(e).__name__}

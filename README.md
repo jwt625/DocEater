@@ -6,8 +6,9 @@ A background service that watches folders for new files, converts them to Markdo
 
 - **Automatic File Monitoring**: Watches specified folders for new PDF files
 - **Document Conversion**: Converts documents to Markdown using local Docling with formula enrichment
-- **Database Storage**: Stores documents and metadata in PostgreSQL
-- **CLI Interface**: Easy-to-use command-line interface for manual operations
+- **Image Extraction & Storage**: Automatically extracts and stores images (tables, pictures, formulas) with metadata
+- **Database Storage**: Stores documents, images, and metadata in PostgreSQL with pgvector support
+- **CLI Interface**: Easy-to-use command-line interface for manual operations and image management
 - **Error Handling**: Robust error handling with partial content recovery
 - **Type Safety**: Fully typed Python codebase with strict mypy checking
 
@@ -70,16 +71,83 @@ uv run doceat show <document-id>
 uv run doceat status
 ```
 
+#### Manage document images:
+```bash
+# List all images
+uv run doceat images list
+
+# List images for a specific document
+uv run doceat images list --document-id <document-id>
+
+# Export images from a document
+uv run doceat images export --document-id <document-id> --output ./exported_images
+
+# Show image storage statistics
+uv run doceat images stats
+
+# Filter images by type
+uv run doceat images list --type table
+```
+
 ## Configuration
 
 Configuration is managed through environment variables or a `.env` file:
 
+### Core Settings
 - `DOCEATER_DATABASE_URL`: PostgreSQL connection URL
 - `DOCEATER_WATCH_FOLDER`: Folder to monitor (default: ~/Downloads)
 - `DOCEATER_MAX_FILE_SIZE_MB`: Maximum file size to process (default: 100MB)
 - `DOCEATER_LOG_LEVEL`: Logging level (default: INFO)
 
+### Image Storage Settings
+- `DOCEATER_IMAGES_ENABLED`: Enable image extraction and storage (default: true)
+- `DOCEATER_IMAGES_BASE_PATH`: Base directory for storing images (default: ~/doceater_data/images)
+- `DOCEATER_IMAGES_MAX_SIZE_MB`: Maximum size per image in MB (default: 50)
+- `DOCEATER_IMAGES_ORGANIZE_BY_DATE`: Organize images by date (default: true)
+- `DOCEATER_IMAGES_CLEANUP_FAILED`: Auto-cleanup failed extractions (default: true)
+- `DOCEATER_IMAGES_RETENTION_DAYS`: Image retention period in days (default: 365)
+
+### Docling Settings
+- `DOCEATER_DOCLING_ENRICH_FORMULA`: Enable formula enrichment (default: true)
+
 See `.env.example` for all available options.
+
+## Image Storage
+
+DocEater automatically extracts and stores images from documents with the following features:
+
+### Supported Image Types
+- **Pictures**: General images and photographs
+- **Tables**: Extracted table visualizations
+- **Formulas**: Mathematical equations and formulas
+- **Charts**: Graphs and charts
+- **Diagrams**: Technical diagrams and flowcharts
+
+### Storage Organization
+Images are organized in a date-based directory structure:
+```
+~/doceater_data/images/
+├── 2025/01/19/
+│   └── {document-id}/
+│       ├── picture-1.png
+│       ├── table-1.png
+│       └── formula-1.png
+└── 2025/01/20/
+    └── {another-document-id}/
+        └── picture-1.png
+```
+
+### Database Integration
+- Image metadata (dimensions, file size, type) stored in PostgreSQL
+- Relationships maintained between documents and their images
+- Fast querying by image type, document, or date
+
+### CLI Management
+Use the `doceat images` command to:
+- List images by document or type
+- Export images to local directories
+- View storage statistics
+- Clean up orphaned files
 
 ## Development
 

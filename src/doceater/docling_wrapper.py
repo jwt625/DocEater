@@ -9,7 +9,6 @@ from typing import Any
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling_core.types.doc import ImageRefMode, PictureItem, TableItem
 from loguru import logger
 
@@ -139,6 +138,79 @@ class DoclingWrapper:
 
         logger.info(f"Extracted {len(extracted_images)} images to {output_dir}")
         return markdown_content, extracted_images
+
+    def convert_to_markdown_with_storage(
+        self,
+        file_path: Path | str,
+        temp_dir: Path | str | None = None,
+        image_mode: str = "referenced"
+    ) -> tuple[str, list[Path]]:
+        """Convert document to Markdown with temporary image extraction for storage.
+
+        This method extracts images to a temporary directory for processing by
+        the ImageStorageManager, rather than storing them directly.
+
+        Args:
+            file_path: Path to the document to convert
+            temp_dir: Temporary directory for image extraction (default: system temp)
+            image_mode: "embedded" for base64 images, "referenced" for file references
+
+        Returns:
+            Tuple of (markdown_content, list_of_temp_image_paths)
+        """
+        if not self.enable_image_extraction:
+            logger.warning("Image extraction is disabled. Use enable_image_extraction=True")
+            return self.convert_to_markdown(file_path), []
+
+        result = self.convert_document(file_path)
+
+        # Set up temporary directory for images
+        if temp_dir is None:
+            import tempfile
+            temp_dir = Path(tempfile.mkdtemp(prefix="doceater_images_"))
+        else:
+            temp_dir = Path(temp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Extract and save images to temporary location
+        extracted_images = self.extract_images(result, temp_dir)
+
+        # Convert to markdown with image references
+        if image_mode == "embedded":
+            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.EMBEDDED)
+        else:
+            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.REFERENCED)
+
+        logger.info(f"Extracted {len(extracted_images)} images to temporary directory {temp_dir}")
+        return markdown_content, extracted_images
+
+    def get_image_metadata_from_result(self, conversion_result: Any) -> dict[str, Any]:
+        """Extract image metadata from conversion result.
+
+        Args:
+            conversion_result: Docling conversion result
+
+        Returns:
+            Dictionary with image metadata including counts by type
+        """
+        metadata = {
+            "total_images": 0,
+            "table_count": 0,
+            "picture_count": 0,
+            "image_types": [],
+        }
+
+        for element, _ in conversion_result.document.iterate_items():
+            if isinstance(element, TableItem):
+                metadata["table_count"] += 1
+                metadata["total_images"] += 1
+                metadata["image_types"].append("table")
+            elif isinstance(element, PictureItem):
+                metadata["picture_count"] += 1
+                metadata["total_images"] += 1
+                metadata["image_types"].append("picture")
+
+        return metadata
 
     def extract_images(self, conversion_result: Any, output_dir: Path) -> list[Path]:
         """Extract images from conversion result and save to files.

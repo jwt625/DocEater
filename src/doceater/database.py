@@ -20,8 +20,10 @@ from .config import Settings, get_settings
 from .models import (
     Base,
     Document,
+    DocumentImage,
     DocumentMetadata,
     DocumentStatus,
+    ImageType,
     LogLevel,
     ProcessingLog,
 )
@@ -240,6 +242,96 @@ class DatabaseManager:
             metadata_entries = result.scalars().all()
 
             return {entry.key: entry.value for entry in metadata_entries}
+
+    # Image operations
+    async def create_document_image(
+        self,
+        document_id: uuid.UUID,
+        image_path: str,
+        filename: str,
+        image_type: ImageType,
+        image_index: int,
+        file_size: int,
+        width: int | None = None,
+        height: int | None = None,
+        format: str | None = None,
+        extraction_method: str | None = "docling",
+        quality_score: float | None = None,
+    ) -> DocumentImage:
+        """Create a new document image record."""
+        image = DocumentImage(
+            document_id=document_id,
+            image_path=image_path,
+            filename=filename,
+            image_type=image_type,
+            image_index=image_index,
+            file_size=file_size,
+            width=width,
+            height=height,
+            format=format,
+            extraction_method=extraction_method,
+            quality_score=quality_score,
+        )
+
+        async with self.get_session() as session:
+            session.add(image)
+            await session.flush()  # Get the ID
+            await session.refresh(image)
+
+        logger.debug(f"Created image record: {image.id} for document {document_id}")
+        return image
+
+    async def get_document_images(
+        self, document_id: uuid.UUID
+    ) -> Sequence[DocumentImage]:
+        """Get all images for a document."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(DocumentImage)
+                .where(DocumentImage.document_id == document_id)
+                .order_by(DocumentImage.image_index)
+            )
+            return result.scalars().all()
+
+    async def get_document_image_by_id(
+        self, image_id: uuid.UUID
+    ) -> DocumentImage | None:
+        """Get a specific document image by ID."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(DocumentImage).where(DocumentImage.id == image_id)
+            )
+            return result.scalar_one_or_none()
+
+    async def delete_document_images(self, document_id: uuid.UUID) -> int:
+        """Delete all images for a document. Returns count of deleted images."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(DocumentImage).where(DocumentImage.document_id == document_id)
+            )
+            images = result.scalars().all()
+            count = len(images)
+
+            for image in images:
+                await session.delete(image)
+
+        logger.debug(f"Deleted {count} images for document {document_id}")
+        return count
+
+    async def get_images_by_type(
+        self, image_type: ImageType, limit: int = 100, offset: int = 0
+    ) -> Sequence[DocumentImage]:
+        """Get images by type across all documents."""
+        async with self.get_session() as session:
+            query = (
+                select(DocumentImage)
+                .where(DocumentImage.image_type == image_type)
+                .order_by(DocumentImage.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await session.execute(query)
+            return result.scalars().all()
 
     # Logging operations
     async def log_processing(

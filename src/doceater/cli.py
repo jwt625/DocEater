@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 import sys
 import uuid
 from pathlib import Path
@@ -16,7 +17,8 @@ from rich.text import Text
 from . import __version__
 from .config import get_settings
 from .database import get_db_manager
-from .models import DocumentStatus
+from .image_storage import ImageStorageManager
+from .models import DocumentStatus, ImageType
 from .watcher import FileWatcher
 
 # Create CLI app
@@ -338,6 +340,181 @@ def status() -> None:
             await db_manager.close()
 
     asyncio.run(_status())
+
+
+@app.command()
+def images(
+    action: str = typer.Argument(..., help="Action: list, export, cleanup, stats"),
+    document_id: str = typer.Option(None, "--document-id", "-d", help="Document ID for list/export actions"),
+    output_dir: str = typer.Option("./exported_images", "--output", "-o", help="Output directory for export"),
+    image_type: str = typer.Option(None, "--type", "-t", help="Filter by image type (picture, table, etc.)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+) -> None:
+    """Manage document images."""
+    setup_logging(verbose)
+
+    async def _images() -> None:
+        db_manager = get_db_manager()
+        settings = get_settings()
+        image_storage = ImageStorageManager(settings)
+
+        try:
+            if action == "list":
+                if document_id:
+                    # List images for specific document
+                    try:
+                        doc_uuid = uuid.UUID(document_id)
+                    except ValueError:
+                        console.print(f"❌ Invalid document ID: {document_id}")
+                        raise typer.Exit(1) from None
+
+                    # Get document info
+                    document = await db_manager.get_document_by_id(doc_uuid)
+                    if not document:
+                        console.print(f"❌ Document not found: {document_id}")
+                        raise typer.Exit(1) from None
+
+                    # Get images
+                    images = await db_manager.get_document_images(doc_uuid)
+
+                    console.print(f"\n📄 Document: {document.filename}")
+                    console.print(f"📁 Images: {len(images)}")
+
+                    if images:
+                        table = Table(title="Document Images")
+                        table.add_column("Index", style="cyan")
+                        table.add_column("Type", style="green")
+                        table.add_column("Filename", style="blue")
+                        table.add_column("Size", style="yellow")
+                        table.add_column("Dimensions", style="magenta")
+
+                        for image in images:
+                            size_mb = image.file_size / (1024 * 1024)
+                            dimensions = f"{image.width}x{image.height}" if image.width and image.height else "Unknown"
+                            table.add_row(
+                                str(image.image_index),
+                                image.image_type.value,
+                                image.filename,
+                                f"{size_mb:.2f} MB",
+                                dimensions
+                            )
+
+                        console.print(table)
+                    else:
+                        console.print("No images found for this document.")
+
+                else:
+                    # List all images with optional type filter
+                    if image_type:
+                        try:
+                            img_type = ImageType(image_type.lower())
+                            images = await db_manager.get_images_by_type(img_type, limit=50)
+                            console.print(f"\n📷 Images of type '{image_type}': {len(images)}")
+                        except ValueError:
+                            console.print(f"❌ Invalid image type: {image_type}")
+                            console.print("Valid types: picture, table, formula, chart, diagram, page")
+                            raise typer.Exit(1) from None
+                    else:
+                        # Get recent images across all documents
+                        images = await db_manager.get_images_by_type(ImageType.PICTURE, limit=25)
+                        table_images = await db_manager.get_images_by_type(ImageType.TABLE, limit=25)
+                        images.extend(table_images)
+                        console.print(f"\n📷 Recent images: {len(images)}")
+
+                    if images:
+                        table = Table(title="All Images")
+                        table.add_column("Document ID", style="cyan")
+                        table.add_column("Type", style="green")
+                        table.add_column("Filename", style="blue")
+                        table.add_column("Created", style="yellow")
+
+                        for image in images[:20]:  # Limit display
+                            table.add_row(
+                                str(image.document_id)[:8] + "...",
+                                image.image_type.value,
+                                image.filename,
+                                image.created_at.strftime("%Y-%m-%d %H:%M")
+                            )
+
+                        console.print(table)
+                    else:
+                        console.print("No images found.")
+
+            elif action == "export":
+                if not document_id:
+                    console.print("❌ Document ID required for export action")
+                    raise typer.Exit(1) from None
+
+                try:
+                    doc_uuid = uuid.UUID(document_id)
+                except ValueError:
+                    console.print(f"❌ Invalid document ID: {document_id}")
+                    raise typer.Exit(1) from None
+
+                # Get document and images
+                document = await db_manager.get_document_by_id(doc_uuid)
+                if not document:
+                    console.print(f"❌ Document not found: {document_id}")
+                    raise typer.Exit(1) from None
+
+                images = await db_manager.get_document_images(doc_uuid)
+                if not images:
+                    console.print("No images to export for this document.")
+                    return
+
+                # Create output directory
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+
+                # Export images
+                exported_count = 0
+                for image in images:
+                    try:
+                        source_path = await image_storage.get_image_path(doc_uuid, image.image_path)
+                        if source_path.exists():
+                            target_path = output_path / image.filename
+                            shutil.copy2(source_path, target_path)
+                            exported_count += 1
+                        else:
+                            console.print(f"⚠️  Image file not found: {image.filename}")
+                    except Exception as e:
+                        console.print(f"❌ Failed to export {image.filename}: {e}")
+
+                console.print(f"✅ Exported {exported_count}/{len(images)} images to {output_path}")
+
+            elif action == "cleanup":
+                # Cleanup orphaned images
+                console.print("🧹 Cleaning up orphaned images...")
+                # This would require implementing orphan detection logic
+                console.print("Cleanup functionality not yet implemented.")
+
+            elif action == "stats":
+                # Show storage statistics
+                stats = image_storage.get_storage_stats()
+                console.print("\n📊 Image Storage Statistics")
+                console.print(f"Base path: {stats['base_path']}")
+                console.print(f"Total files: {stats['total_files']}")
+                console.print(f"Total size: {stats['total_size_mb']:.2f} MB")
+
+                # Get database stats
+                picture_count = len(await db_manager.get_images_by_type(ImageType.PICTURE, limit=1000))
+                table_count = len(await db_manager.get_images_by_type(ImageType.TABLE, limit=1000))
+
+                console.print(f"Pictures in DB: {picture_count}")
+                console.print(f"Tables in DB: {table_count}")
+
+            else:
+                console.print(f"❌ Unknown action: {action}")
+                console.print("Available actions: list, export, cleanup, stats")
+                raise typer.Exit(1) from None
+
+        except Exception as e:
+            console.print(f"❌ Error: {e}")
+            raise typer.Exit(1) from None
+        finally:
+            await db_manager.close()
+
+    asyncio.run(_images())
 
 
 def main() -> None:

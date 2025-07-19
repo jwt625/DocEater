@@ -7,9 +7,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, DateTime, String, Text, func
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -30,6 +30,16 @@ class LogLevel(str, Enum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
+
+
+class ImageType(str, Enum):
+    """Type of extracted image."""
+    PICTURE = "picture"
+    TABLE = "table"
+    FORMULA = "formula"
+    CHART = "chart"
+    DIAGRAM = "diagram"
+    PAGE = "page"
 
 
 class Document(Base):
@@ -103,8 +113,108 @@ class Document(Base):
         nullable=True
     )
 
+    # Relationships
+    images: Mapped[list[DocumentImage]] = relationship(
+        "DocumentImage",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
+
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', status='{self.status}')>"
+
+
+class DocumentImage(Base):
+    """Document images table for storing extracted image information."""
+
+    __tablename__ = "document_images"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True
+    )
+
+    # Foreign key to document
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    # File information
+    image_path: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="Relative path from images root directory"
+    )
+    filename: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Original extracted filename"
+    )
+    image_type: Mapped[ImageType] = mapped_column(
+        String(20),
+        nullable=False,
+        index=True,
+        comment="Type of image: picture, table, formula, etc."
+    )
+    image_index: Mapped[int] = mapped_column(
+        nullable=False,
+        comment="Order/index within the document"
+    )
+
+    # Image properties
+    file_size: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        comment="Image file size in bytes"
+    )
+    width: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Image width in pixels"
+    )
+    height: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Image height in pixels"
+    )
+    format: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+        comment="Image format: PNG, JPEG, WEBP, etc."
+    )
+
+    # Processing metadata
+    extraction_method: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        default="docling",
+        comment="Method used for extraction"
+    )
+    quality_score: Mapped[float | None] = mapped_column(
+        nullable=True,
+        comment="Optional quality assessment score"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=func.now(),
+        index=True
+    )
+
+    # Relationships
+    document: Mapped[Document] = relationship(
+        "Document",
+        back_populates="images"
+    )
+
+    def __repr__(self) -> str:
+        return f"<DocumentImage(id={self.id}, document_id={self.document_id}, type='{self.image_type}', filename='{self.filename}')>"
 
 
 class DocumentMetadata(Base):
