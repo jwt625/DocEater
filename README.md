@@ -6,9 +6,9 @@ A background service that watches folders for new files, converts them to Markdo
 
 - **Automatic File Monitoring**: Watches specified folders for new PDF files
 - **Document Conversion**: Converts documents to Markdown using local Docling with formula enrichment
-- **Image Extraction & Storage**: Automatically extracts and stores images (tables, pictures, formulas) with metadata
+- **Image Extraction & Storage**: Automatically extracts and stores images with metadata and database tracking
 - **Database Storage**: Stores documents, images, and metadata in PostgreSQL with pgvector support
-- **CLI Interface**: Easy-to-use command-line interface for manual operations and image management
+- **CLI Interface**: Command-line interface for manual operations and image management
 - **Error Handling**: Robust error handling with partial content recovery
 - **Type Safety**: Fully typed Python codebase with strict mypy checking
 
@@ -84,9 +84,6 @@ uv run doceat images export --document-id <document-id> --output ./exported_imag
 
 # Show image storage statistics
 uv run doceat images stats
-
-# Filter images by type
-uv run doceat images list --type table
 ```
 
 ## Configuration
@@ -105,7 +102,6 @@ Configuration is managed through environment variables or a `.env` file:
 - `DOCEATER_IMAGES_MAX_SIZE_MB`: Maximum size per image in MB (default: 50)
 - `DOCEATER_IMAGES_ORGANIZE_BY_DATE`: Organize images by date (default: true)
 - `DOCEATER_IMAGES_CLEANUP_FAILED`: Auto-cleanup failed extractions (default: true)
-- `DOCEATER_IMAGES_RETENTION_DAYS`: Image retention period in days (default: 365)
 
 ### Docling Settings
 - `DOCEATER_DOCLING_ENRICH_FORMULA`: Enable formula enrichment (default: true)
@@ -114,40 +110,28 @@ See `.env.example` for all available options.
 
 ## Image Storage
 
-DocEater automatically extracts and stores images from documents with the following features:
+DocEater automatically extracts and stores images from documents during processing.
 
 ### Supported Image Types
-- **Pictures**: General images and photographs
-- **Tables**: Extracted table visualizations
-- **Formulas**: Mathematical equations and formulas
-- **Charts**: Graphs and charts
-- **Diagrams**: Technical diagrams and flowcharts
+- Pictures, tables, formulas, charts, diagrams, and page images
+- Automatic type detection based on Docling classification
+- Metadata extraction including dimensions, file size, and format
 
 ### Storage Organization
-Images are organized in a date-based directory structure:
+Images are organized in a date-based directory structure under the configured base path:
 ```
-~/doceater_data/images/
-├── 2025/01/19/
-│   └── {document-id}/
-│       ├── picture-1.png
-│       ├── table-1.png
-│       └── formula-1.png
-└── 2025/01/20/
-    └── {another-document-id}/
-        └── picture-1.png
+~/doceater_data/images/YYYY/MM/DD/{document-id}/
 ```
 
 ### Database Integration
-- Image metadata (dimensions, file size, type) stored in PostgreSQL
-- Relationships maintained between documents and their images
-- Fast querying by image type, document, or date
+- Image metadata stored in PostgreSQL with document relationships
+- Full-text search capabilities for image properties
+- Efficient querying by type, document, or date
 
-### CLI Management
-Use the `doceat images` command to:
-- List images by document or type
-- Export images to local directories
-- View storage statistics
-- Clean up orphaned files
+### Management
+- CLI commands for listing, exporting, and managing images
+- Configurable storage limits and retention policies
+- Automatic cleanup of failed extractions
 
 ## Development
 
