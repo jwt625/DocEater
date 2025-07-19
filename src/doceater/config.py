@@ -22,104 +22,92 @@ class Settings(BaseSettings):
     # Database settings
     database_url: str = Field(
         default="postgresql://localhost:5432/doceater",
-        description="PostgreSQL database URL"
+        description="PostgreSQL database URL",
     )
 
     # File watching settings
     watch_folder: str = Field(
         default_factory=lambda: str(Path.home() / "Downloads"),
-        description="Folder to watch for new files"
+        description="Folder to watch for new files",
     )
-    watch_recursive: bool = Field(
-        default=True,
-        description="Watch folder recursively"
-    )
+    watch_recursive: bool = Field(default=True, description="Watch folder recursively")
 
     # File processing settings
     max_file_size_mb: int = Field(
-        default=100,
-        description="Maximum file size to process in MB"
+        default=100, description="Maximum file size to process in MB"
     )
     supported_extensions: list[str] = Field(
         default_factory=lambda: [
-            ".pdf", ".docx", ".pptx", ".html", ".md",
-            ".xlsx", ".csv", ".xml"
+            ".pdf",
+            ".docx",
+            ".pptx",
+            ".html",
+            ".md",
+            ".xlsx",
+            ".csv",
+            ".xml",
         ],  # Actual Docling-supported formats
-        description="Supported file extensions"
+        description="Supported file extensions",
     )
     exclude_patterns: list[str] = Field(
         default_factory=lambda: [".*", "~*", "*.tmp", "*.temp"],
-        description="File patterns to exclude"
+        description="File patterns to exclude",
     )
 
     # Docling settings
     docling_enrich_formula: bool = Field(
-        default=True,
-        description="Enable formula enrichment in Docling"
+        default=True, description="Enable formula enrichment in Docling"
     )
 
     # Image storage settings
     images_enabled: bool = Field(
-        default=True,
-        description="Enable image extraction and storage"
+        default=True, description="Enable image extraction and storage"
     )
     images_base_path: str = Field(
         default_factory=lambda: str(Path.home() / "doceater_data" / "images"),
-        description="Base directory for storing extracted images"
+        description="Base directory for storing extracted images",
     )
     images_max_size_mb: int = Field(
-        default=50,
-        description="Maximum size per image in MB"
+        default=50, description="Maximum size per image in MB"
     )
     images_allowed_formats: list[str] = Field(
         default_factory=lambda: ["PNG", "JPEG", "WEBP"],
-        description="Allowed image formats for storage"
+        description="Allowed image formats for storage",
     )
     images_compression_quality: int = Field(
-        default=85,
-        description="JPEG compression quality (1-100)"
+        default=85, description="JPEG compression quality (1-100)"
     )
     images_organize_by_date: bool = Field(
-        default=True,
-        description="Organize images in date-based directory structure"
+        default=True, description="Organize images in date-based directory structure"
     )
     images_cleanup_failed: bool = Field(
-        default=True,
-        description="Automatically cleanup images from failed extractions"
+        default=True, description="Automatically cleanup images from failed extractions"
     )
     images_retention_days: int = Field(
-        default=365,
-        description="Number of days to retain images (0 = forever)"
+        default=365, description="Number of days to retain images (0 = forever)"
     )
 
     # Processing settings
     max_concurrent_files: int = Field(
-        default=3,
-        description="Maximum number of files to process concurrently"
+        default=3, description="Maximum number of files to process concurrently"
     )
     processing_delay_seconds: float = Field(
         default=1.0,
-        description="Delay between processing files to avoid overwhelming system"
+        description="Delay between processing files to avoid overwhelming system",
     )
 
     # Logging settings
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level"
-    )
+    log_level: str = Field(default="INFO", description="Logging level")
     log_file: str | None = Field(
-        default=None,
-        description="Log file path (if None, logs to console)"
+        default=None, description="Log file path (if None, logs to console)"
     )
 
     # Service settings
     service_name: str = Field(
-        default="doceater",
-        description="Service name for daemon mode"
+        default="doceater", description="Service name for daemon mode"
     )
     pid_file: str | None = Field(
-        default=None,
-        description="PID file path for daemon mode"
+        default=None, description="PID file path for daemon mode"
     )
 
     @field_validator("watch_folder")

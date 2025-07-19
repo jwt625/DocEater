@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import pytest
 
 from doceater.database import DatabaseManager
-from doceater.models import Document, DocumentMetadata, DocumentStatus, LogLevel, ProcessingLog
+from doceater.models import (
+    Document,
+    DocumentStatus,
+    LogLevel,
+)
 
 
 class TestDatabaseManager:
@@ -24,6 +27,7 @@ class TestDatabaseManager:
 
         # Verify tables exist by trying to query them
         from sqlalchemy import text
+
         async with test_db_manager.get_session() as session:
             # This should not raise an error if tables exist
             result = await session.execute(text("SELECT COUNT(*) FROM documents"))
@@ -130,14 +134,18 @@ class TestDatabaseManager:
         )
 
         # Update status to processing
-        await test_db_manager.update_document_status(created_doc.id, DocumentStatus.PROCESSING)
+        await test_db_manager.update_document_status(
+            created_doc.id, DocumentStatus.PROCESSING
+        )
 
         doc = await test_db_manager.get_document_by_id(created_doc.id)
         assert doc is not None
         assert doc.status == DocumentStatus.PROCESSING
 
         # Update status to failed
-        await test_db_manager.update_document_status(created_doc.id, DocumentStatus.FAILED)
+        await test_db_manager.update_document_status(
+            created_doc.id, DocumentStatus.FAILED
+        )
 
         doc = await test_db_manager.get_document_by_id(created_doc.id)
         assert doc is not None
@@ -160,7 +168,7 @@ class TestDatabaseManager:
             content_hash="list2",
             file_size=2048,
         )
-        
+
         # Update one to completed
         await test_db_manager.update_document_status(doc2.id, DocumentStatus.COMPLETED)
 
@@ -169,23 +177,29 @@ class TestDatabaseManager:
         assert len(all_docs) >= 2
 
         # List only pending documents
-        pending_docs = await test_db_manager.list_documents(status=DocumentStatus.PENDING)
+        pending_docs = await test_db_manager.list_documents(
+            status=DocumentStatus.PENDING
+        )
         pending_ids = [doc.id for doc in pending_docs]
         assert doc1.id in pending_ids
         assert doc2.id not in pending_ids
 
         # List only completed documents
-        completed_docs = await test_db_manager.list_documents(status=DocumentStatus.COMPLETED)
+        completed_docs = await test_db_manager.list_documents(
+            status=DocumentStatus.COMPLETED
+        )
         completed_ids = [doc.id for doc in completed_docs]
         assert doc2.id in completed_ids
         assert doc1.id not in completed_ids
-        
+
         # Test limit
         limited_docs = await test_db_manager.list_documents(limit=1)
         assert len(limited_docs) == 1
 
     @pytest.mark.asyncio
-    async def test_document_exists_after_creation(self, test_db_manager: DatabaseManager):
+    async def test_document_exists_after_creation(
+        self, test_db_manager: DatabaseManager
+    ):
         """Test that a document exists after creation and can be retrieved."""
         # Create a document
         created_doc = await test_db_manager.create_document(

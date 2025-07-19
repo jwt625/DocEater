@@ -5,9 +5,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-import pytest
-
-from doceater.models import Document, DocumentMetadata, DocumentStatus, LogLevel, ProcessingLog
+from doceater.models import (
+    Document,
+    DocumentMetadata,
+    DocumentStatus,
+    LogLevel,
+    ProcessingLog,
+)
 
 
 class TestDocumentStatus:

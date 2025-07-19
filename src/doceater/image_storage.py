@@ -57,7 +57,12 @@ class ImageStorageManager:
         if self.settings.images_organize_by_date:
             # Date-based organization: YYYY/MM/DD/document_id/
             now = datetime.now()
-            date_path = self.base_path / f"{now.year:04d}" / f"{now.month:02d}" / f"{now.day:02d}"
+            date_path = (
+                self.base_path
+                / f"{now.year:04d}"
+                / f"{now.month:02d}"
+                / f"{now.day:02d}"
+            )
         else:
             # Simple organization: document_id/
             date_path = self.base_path
@@ -86,7 +91,9 @@ class ImageStorageManager:
         max_size = self.settings.images_max_size_bytes
 
         if file_size > max_size:
-            logger.warning(f"Image {file_path} size {file_size} exceeds limit {max_size}")
+            logger.warning(
+                f"Image {file_path} size {file_size} exceeds limit {max_size}"
+            )
             return False
 
         return True
@@ -126,7 +133,9 @@ class ImageStorageManager:
         storage_path = self._get_storage_path(document_id)
         stored_images = []
 
-        logger.info(f"Storing {len(image_paths)} images for document {document_id} in {storage_path}")
+        logger.info(
+            f"Storing {len(image_paths)} images for document {document_id} in {storage_path}"
+        )
 
         for index, source_path in enumerate(image_paths, 1):
             try:
@@ -176,7 +185,9 @@ class ImageStorageManager:
                         pass
                 continue
 
-        logger.info(f"Successfully stored {len(stored_images)} images for document {document_id}")
+        logger.info(
+            f"Successfully stored {len(stored_images)} images for document {document_id}"
+        )
         return stored_images
 
     async def get_image_path(self, document_id: uuid.UUID, relative_path: str) -> Path:

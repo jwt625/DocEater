@@ -188,7 +188,9 @@ def ingest(
 
 @app.command()
 def list(
-    status: str = typer.Option(None, help="Filter by status (pending, processing, completed, failed)"),
+    status: str = typer.Option(
+        None, help="Filter by status (pending, processing, completed, failed)"
+    ),
     limit: int = typer.Option(20, help="Maximum number of documents to show"),
 ) -> None:
     """List processed documents."""
@@ -204,7 +206,9 @@ def list(
                     status_filter = DocumentStatus(status.lower())
                 except ValueError:
                     console.print(f"❌ Invalid status: {status}")
-                    console.print("Valid statuses: pending, processing, completed, failed")
+                    console.print(
+                        "Valid statuses: pending, processing, completed, failed"
+                    )
                     raise typer.Exit(1)
 
             # Get documents
@@ -345,9 +349,15 @@ def status() -> None:
 @app.command()
 def images(
     action: str = typer.Argument(..., help="Action: list, export, cleanup, stats"),
-    document_id: str = typer.Option(None, "--document-id", "-d", help="Document ID for list/export actions"),
-    output_dir: str = typer.Option("./exported_images", "--output", "-o", help="Output directory for export"),
-    image_type: str = typer.Option(None, "--type", "-t", help="Filter by image type (picture, table, etc.)"),
+    document_id: str = typer.Option(
+        None, "--document-id", "-d", help="Document ID for list/export actions"
+    ),
+    output_dir: str = typer.Option(
+        "./exported_images", "--output", "-o", help="Output directory for export"
+    ),
+    image_type: str = typer.Option(
+        None, "--type", "-t", help="Filter by image type (picture, table, etc.)"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ) -> None:
     """Manage document images."""
@@ -390,13 +400,17 @@ def images(
 
                         for image in images:
                             size_mb = image.file_size / (1024 * 1024)
-                            dimensions = f"{image.width}x{image.height}" if image.width and image.height else "Unknown"
+                            dimensions = (
+                                f"{image.width}x{image.height}"
+                                if image.width and image.height
+                                else "Unknown"
+                            )
                             table.add_row(
                                 str(image.image_index),
                                 image.image_type.value,
                                 image.filename,
                                 f"{size_mb:.2f} MB",
-                                dimensions
+                                dimensions,
                             )
 
                         console.print(table)
@@ -408,16 +422,26 @@ def images(
                     if image_type:
                         try:
                             img_type = ImageType(image_type.lower())
-                            images = await db_manager.get_images_by_type(img_type, limit=50)
-                            console.print(f"\n📷 Images of type '{image_type}': {len(images)}")
+                            images = await db_manager.get_images_by_type(
+                                img_type, limit=50
+                            )
+                            console.print(
+                                f"\n📷 Images of type '{image_type}': {len(images)}"
+                            )
                         except ValueError:
                             console.print(f"❌ Invalid image type: {image_type}")
-                            console.print("Valid types: picture, table, formula, chart, diagram, page")
+                            console.print(
+                                "Valid types: picture, table, formula, chart, diagram, page"
+                            )
                             raise typer.Exit(1) from None
                     else:
                         # Get recent images across all documents
-                        images = await db_manager.get_images_by_type(ImageType.PICTURE, limit=25)
-                        table_images = await db_manager.get_images_by_type(ImageType.TABLE, limit=25)
+                        images = await db_manager.get_images_by_type(
+                            ImageType.PICTURE, limit=25
+                        )
+                        table_images = await db_manager.get_images_by_type(
+                            ImageType.TABLE, limit=25
+                        )
                         images.extend(table_images)
                         console.print(f"\n📷 Recent images: {len(images)}")
 
@@ -433,7 +457,7 @@ def images(
                                 str(image.document_id)[:8] + "...",
                                 image.image_type.value,
                                 image.filename,
-                                image.created_at.strftime("%Y-%m-%d %H:%M")
+                                image.created_at.strftime("%Y-%m-%d %H:%M"),
                             )
 
                         console.print(table)
@@ -470,7 +494,9 @@ def images(
                 exported_count = 0
                 for image in images:
                     try:
-                        source_path = await image_storage.get_image_path(doc_uuid, image.image_path)
+                        source_path = await image_storage.get_image_path(
+                            doc_uuid, image.image_path
+                        )
                         if source_path.exists():
                             target_path = output_path / image.filename
                             shutil.copy2(source_path, target_path)
@@ -480,7 +506,9 @@ def images(
                     except Exception as e:
                         console.print(f"❌ Failed to export {image.filename}: {e}")
 
-                console.print(f"✅ Exported {exported_count}/{len(images)} images to {output_path}")
+                console.print(
+                    f"✅ Exported {exported_count}/{len(images)} images to {output_path}"
+                )
 
             elif action == "cleanup":
                 # Cleanup orphaned images
@@ -497,8 +525,12 @@ def images(
                 console.print(f"Total size: {stats['total_size_mb']:.2f} MB")
 
                 # Get database stats
-                picture_count = len(await db_manager.get_images_by_type(ImageType.PICTURE, limit=1000))
-                table_count = len(await db_manager.get_images_by_type(ImageType.TABLE, limit=1000))
+                picture_count = len(
+                    await db_manager.get_images_by_type(ImageType.PICTURE, limit=1000)
+                )
+                table_count = len(
+                    await db_manager.get_images_by_type(ImageType.TABLE, limit=1000)
+                )
 
                 console.print(f"Pictures in DB: {picture_count}")
                 console.print(f"Tables in DB: {table_count}")

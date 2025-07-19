@@ -119,7 +119,9 @@ class DocumentProcessor:
             logger.error(f"Failed to convert document {file_path}: {e}")
             raise
 
-    async def convert_to_markdown_with_images(self, file_path: Path) -> tuple[str, list[Path]]:
+    async def convert_to_markdown_with_images(
+        self, file_path: Path
+    ) -> tuple[str, list[Path]]:
         """Convert document to markdown and extract images.
 
         Args:
@@ -181,7 +183,10 @@ class DocumentProcessor:
             try:
                 # Convert to markdown with optional image extraction
                 if self.settings.images_enabled:
-                    markdown_content, temp_image_paths = await self.convert_to_markdown_with_images(file_path)
+                    (
+                        markdown_content,
+                        temp_image_paths,
+                    ) = await self.convert_to_markdown_with_images(file_path)
 
                     # Store images persistently
                     if temp_image_paths:
@@ -207,18 +212,25 @@ class DocumentProcessor:
                                         quality_score=None,
                                     )
                                 except Exception as e:
-                                    logger.error(f"Failed to save image metadata for {stored_image.filename}: {e}")
+                                    logger.error(
+                                        f"Failed to save image metadata for {stored_image.filename}: {e}"
+                                    )
                                     # Continue with other images
 
-                            logger.info(f"Stored {len(stored_images)} images for document {document.id}")
+                            logger.info(
+                                f"Stored {len(stored_images)} images for document {document.id}"
+                            )
 
                         except Exception as e:
-                            logger.error(f"Failed to store images for document {document.id}: {e}")
+                            logger.error(
+                                f"Failed to store images for document {document.id}: {e}"
+                            )
                             # Continue processing without images
                             stored_images = []
 
                         # Clean up temporary images
                         import shutil
+
                         for temp_path in temp_image_paths:
                             try:
                                 if temp_path.exists():
@@ -228,7 +240,9 @@ class DocumentProcessor:
                                         shutil.rmtree(temp_dir, ignore_errors=True)
                                     break  # Only need to remove the temp dir once
                             except Exception as e:
-                                logger.warning(f"Failed to cleanup temporary image directory: {e}")
+                                logger.warning(
+                                    f"Failed to cleanup temporary image directory: {e}"
+                                )
                 else:
                     # Text-only conversion
                     markdown_content = await self.convert_to_markdown(file_path)
@@ -252,9 +266,11 @@ class DocumentProcessor:
                     "images_enabled": self.settings.images_enabled,
                 }
 
-                if self.settings.images_enabled and 'stored_images' in locals():
+                if self.settings.images_enabled and "stored_images" in locals():
                     log_details["images_extracted"] = len(stored_images)
-                    log_details["image_types"] = [img.image_type.value for img in stored_images]
+                    log_details["image_types"] = [
+                        img.image_type.value for img in stored_images
+                    ]
 
                 await self.db_manager.log_processing(
                     LogLevel.INFO,
@@ -276,9 +292,13 @@ class DocumentProcessor:
                 if self.settings.images_enabled and self.settings.images_cleanup_failed:
                     try:
                         await self.image_storage.cleanup_document_images(document.id)
-                        logger.debug(f"Cleaned up images for failed document {document.id}")
+                        logger.debug(
+                            f"Cleaned up images for failed document {document.id}"
+                        )
                     except Exception as cleanup_error:
-                        logger.warning(f"Failed to cleanup images for failed document: {cleanup_error}")
+                        logger.warning(
+                            f"Failed to cleanup images for failed document: {cleanup_error}"
+                        )
 
                 # Log error with partial content recovery attempt
                 error_details = {"error": str(e), "error_type": type(e).__name__}
@@ -286,7 +306,9 @@ class DocumentProcessor:
                 # Try to extract partial content
                 try:
                     # For corrupted files, try to extract what we can
-                    partial_content = f"# {file_path.name}\n\n*File processing failed: {e}*\n\n"
+                    partial_content = (
+                        f"# {file_path.name}\n\n*File processing failed: {e}*\n\n"
+                    )
                     partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
 
                     await self.db_manager.update_document_content(
@@ -296,7 +318,9 @@ class DocumentProcessor:
                     )
 
                     error_details["partial_content_saved"] = True
-                    logger.warning(f"Saved partial content for failed file: {file_path}")
+                    logger.warning(
+                        f"Saved partial content for failed file: {file_path}"
+                    )
 
                 except Exception as partial_error:
                     error_details["partial_content_error"] = str(partial_error)

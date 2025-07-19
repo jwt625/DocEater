@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import hashlib
-import tempfile
 from pathlib import Path
 from typing import Any
-
-
-
 
 
 def create_test_text_file(content: str = "Test content") -> str:
@@ -19,7 +15,7 @@ def create_test_text_file(content: str = "Test content") -> str:
 def calculate_content_hash(content: bytes | str) -> str:
     """Calculate SHA-256 hash of content."""
     if isinstance(content, str):
-        content = content.encode('utf-8')
+        content = content.encode("utf-8")
     return hashlib.sha256(content).hexdigest()
 
 
@@ -35,13 +31,13 @@ def create_temp_file(directory: Path, filename: str, content: bytes | str) -> Pa
 
 class MockAsyncContextManager:
     """Mock async context manager for testing."""
-    
+
     def __init__(self, return_value: Any = None):
         self.return_value = return_value
-    
+
     async def __aenter__(self):
         return self.return_value
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
 
@@ -67,7 +63,9 @@ def assert_file_size(file_path: Path, expected_size: int) -> None:
     """Assert that a file has expected size."""
     assert_file_exists(file_path)
     actual_size = file_path.stat().st_size
-    assert actual_size == expected_size, f"File size mismatch: expected {expected_size}, got {actual_size}"
+    assert actual_size == expected_size, (
+        f"File size mismatch: expected {expected_size}, got {actual_size}"
+    )
 
 
 # Common test data

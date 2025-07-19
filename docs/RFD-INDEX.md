@@ -27,9 +27,9 @@ When creating a new RFD:
 3. Include proper metadata at the beginning:
    ```markdown
    # RFD XXX: Title
-   
-   **Author:** Your Name  
-   **Date:** YYYY-MM-DD  
+
+   **Author:** Your Name
+   **Date:** YYYY-MM-DD
    **Status:** Draft
    ```
 4. Update this index with the new RFD

@@ -14,11 +14,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
+
     pass
 
 
 class DocumentStatus(str, Enum):
     """Document processing status."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -27,6 +29,7 @@ class DocumentStatus(str, Enum):
 
 class LogLevel(str, Enum):
     """Log level for processing logs."""
+
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -34,6 +37,7 @@ class LogLevel(str, Enum):
 
 class ImageType(str, Enum):
     """Type of extracted image."""
+
     PICTURE = "picture"
     TABLE = "table"
     FORMULA = "formula"
@@ -49,75 +53,40 @@ class Document(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        index=True
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
 
     # File information
     file_path: Mapped[str] = mapped_column(
-        Text,
-        unique=True,
-        nullable=False,
-        index=True
+        Text, unique=True, nullable=False, index=True
     )
-    filename: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        index=True
-    )
-    content_hash: Mapped[str] = mapped_column(
-        String(64),
-        nullable=False,
-        index=True
-    )
-    file_size: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False
-    )
-    mime_type: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True
-    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Content
-    markdown_content: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True
-    )
+    markdown_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Processing status
     status: Mapped[DocumentStatus] = mapped_column(
-        String(20),
-        nullable=False,
-        default=DocumentStatus.PENDING,
-        index=True
+        String(20), nullable=False, default=DocumentStatus.PENDING, index=True
     )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=func.now(),
-        index=True
+        DateTime(timezone=True), nullable=False, default=func.now(), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=func.now(),
-        onupdate=func.now()
+        DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now()
     )
     processed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True
+        DateTime(timezone=True), nullable=True
     )
 
     # Relationships
     images: Mapped[list[DocumentImage]] = relationship(
-        "DocumentImage",
-        back_populates="document",
-        cascade="all, delete-orphan"
+        "DocumentImage", back_populates="document", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
@@ -131,10 +100,7 @@ class DocumentImage(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        index=True
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
 
     # Foreign key to document
@@ -142,49 +108,38 @@ class DocumentImage(Base):
         UUID(as_uuid=True),
         ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
 
     # File information
     image_path: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        comment="Relative path from images root directory"
+        Text, nullable=False, comment="Relative path from images root directory"
     )
     filename: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        comment="Original extracted filename"
+        String(255), nullable=False, comment="Original extracted filename"
     )
     image_type: Mapped[ImageType] = mapped_column(
         String(20),
         nullable=False,
         index=True,
-        comment="Type of image: picture, table, formula, etc."
+        comment="Type of image: picture, table, formula, etc.",
     )
     image_index: Mapped[int] = mapped_column(
-        nullable=False,
-        comment="Order/index within the document"
+        nullable=False, comment="Order/index within the document"
     )
 
     # Image properties
     file_size: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-        comment="Image file size in bytes"
+        BigInteger, nullable=False, comment="Image file size in bytes"
     )
     width: Mapped[int | None] = mapped_column(
-        nullable=True,
-        comment="Image width in pixels"
+        nullable=True, comment="Image width in pixels"
     )
     height: Mapped[int | None] = mapped_column(
-        nullable=True,
-        comment="Image height in pixels"
+        nullable=True, comment="Image height in pixels"
     )
     format: Mapped[str | None] = mapped_column(
-        String(10),
-        nullable=True,
-        comment="Image format: PNG, JPEG, WEBP, etc."
+        String(10), nullable=True, comment="Image format: PNG, JPEG, WEBP, etc."
     )
 
     # Processing metadata
@@ -192,26 +147,19 @@ class DocumentImage(Base):
         String(50),
         nullable=True,
         default="docling",
-        comment="Method used for extraction"
+        comment="Method used for extraction",
     )
     quality_score: Mapped[float | None] = mapped_column(
-        nullable=True,
-        comment="Optional quality assessment score"
+        nullable=True, comment="Optional quality assessment score"
     )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=func.now(),
-        index=True
+        DateTime(timezone=True), nullable=False, default=func.now(), index=True
     )
 
     # Relationships
-    document: Mapped[Document] = relationship(
-        "Document",
-        back_populates="images"
-    )
+    document: Mapped[Document] = relationship("Document", back_populates="images")
 
     def __repr__(self) -> str:
         return f"<DocumentImage(id={self.id}, document_id={self.document_id}, type='{self.image_type}', filename='{self.filename}')>"
@@ -224,34 +172,21 @@ class DocumentMetadata(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
     # Foreign key to document
     document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True
+        UUID(as_uuid=True), nullable=False, index=True
     )
 
     # Metadata key-value
-    key: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        index=True
-    )
-    value: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True
-    )
+    key: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=func.now()
+        DateTime(timezone=True), nullable=False, default=func.now()
     )
 
     def __repr__(self) -> str:
@@ -265,39 +200,22 @@ class ProcessingLog(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
     # Foreign key to document (optional for system-wide logs)
     document_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=True,
-        index=True
+        UUID(as_uuid=True), nullable=True, index=True
     )
 
     # Log details
-    level: Mapped[LogLevel] = mapped_column(
-        String(10),
-        nullable=False,
-        index=True
-    )
-    message: Mapped[str] = mapped_column(
-        Text,
-        nullable=False
-    )
-    details: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON,
-        nullable=True
-    )
+    level: Mapped[LogLevel] = mapped_column(String(10), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    details: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=func.now(),
-        index=True
+        DateTime(timezone=True), nullable=False, default=func.now(), index=True
     )
 
     def __repr__(self) -> str:

@@ -1,8 +1,8 @@
 # RFD-004: Image Storage and Database Integration
 
-**Status:** Proposal  
-**Author:** DocEater Team  
-**Created:** 2025-01-17  
+**Status:** Proposal
+**Author:** DocEater Team
+**Created:** 2025-01-17
 **Updated:** 2025-01-17
 
 ## Summary
@@ -61,26 +61,26 @@ Document Processing Flow:
 CREATE TABLE document_images (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    
+
     -- File information
     image_path TEXT NOT NULL,           -- Relative path from images root
     filename TEXT NOT NULL,             -- Original extracted filename
     image_type TEXT NOT NULL,           -- 'picture', 'table', 'page'
     image_index INTEGER NOT NULL,       -- Order within document
-    
+
     -- Image properties
     file_size BIGINT NOT NULL,
     width INTEGER,                      -- Image width in pixels
     height INTEGER,                     -- Image height in pixels
     format TEXT,                        -- 'PNG', 'JPEG', etc.
-    
+
     -- Processing metadata
     extraction_method TEXT,             -- 'docling', 'manual', etc.
     quality_score FLOAT,               -- Optional quality assessment
-    
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT NOW(),
-    
+
     -- Indexes
     INDEX idx_document_images_document_id (document_id),
     INDEX idx_document_images_type (image_type),
@@ -147,14 +147,14 @@ class ImageStorageConfig:
    ```python
    class DatabaseManager:
        async def create_document_image(
-           self, document_id: UUID, image_path: str, 
+           self, document_id: UUID, image_path: str,
            filename: str, image_type: str, **kwargs
        ) -> DocumentImage
-       
+
        async def get_document_images(
            self, document_id: UUID
        ) -> list[DocumentImage]
-       
+
        async def delete_document_images(
            self, document_id: UUID
        ) -> None
@@ -166,15 +166,15 @@ class ImageStorageConfig:
    ```python
    class ImageStorageManager:
        def __init__(self, config: ImageStorageConfig)
-       
+
        async def store_images(
            self, document_id: UUID, images: list[Path]
        ) -> list[StoredImage]
-       
+
        async def get_image_path(
            self, document_id: UUID, image_id: UUID
        ) -> Path
-       
+
        async def cleanup_document_images(
            self, document_id: UUID
        ) -> None
@@ -192,16 +192,16 @@ class ImageStorageConfig:
    ```python
    async def process_file(self, file_path: Path) -> bool:
        # ... existing code ...
-       
+
        # Convert with image extraction
        if self.enable_image_extraction:
            markdown_content, extracted_images = await self.convert_with_images(file_path)
-           
+
            # Store images persistently
            stored_images = await self.image_storage.store_images(
                document.id, extracted_images
            )
-           
+
            # Save image metadata to database
            for stored_image in stored_images:
                await self.db_manager.create_document_image(
@@ -218,13 +218,13 @@ class ImageStorageConfig:
    ```bash
    # List document images
    doceater images list <document_id>
-   
+
    # Export images
    doceater images export <document_id> --output-dir ./exported_images/
-   
+
    # Cleanup orphaned images
    doceater images cleanup
-   
+
    # Re-extract images for existing document
    doceater images re-extract <document_id>
    ```
@@ -315,7 +315,7 @@ images:
 async def migrate_existing_documents():
     """Re-process existing documents to extract images."""
     documents = await db.get_documents_without_images()
-    
+
     for document in documents:
         if document.status == DocumentStatus.COMPLETED:
             # Re-extract images from existing documents

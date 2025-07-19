@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,14 +17,20 @@ class TestSettings:
     def test_default_settings(self):
         """Test default settings values."""
         settings = Settings()
-        
+
         assert settings.database_url == "postgresql://localhost:5432/doceater"
         assert settings.watch_folder == str(Path.home() / "Downloads")
         assert settings.watch_recursive is True
         assert settings.max_file_size_mb == 100
         assert settings.supported_extensions == [
-            ".pdf", ".docx", ".pptx", ".html", ".md",
-            ".xlsx", ".csv", ".xml"
+            ".pdf",
+            ".docx",
+            ".pptx",
+            ".html",
+            ".md",
+            ".xlsx",
+            ".csv",
+            ".xml",
         ]
         assert settings.exclude_patterns == [".*", "~*", "*.tmp", "*.temp"]
         assert settings.docling_enrich_formula is True
@@ -66,7 +71,7 @@ class TestSettings:
     def test_computed_properties(self):
         """Test computed properties."""
         settings = Settings(max_file_size_mb=10)
-        
+
         assert settings.max_file_size_bytes == 10 * 1024 * 1024
 
     def test_environment_variables(self, monkeypatch, temp_dir):
@@ -156,7 +161,7 @@ DOCEATER_LOG_LEVEL=ERROR
         """Test that extra fields are ignored."""
         # This should not raise an error
         settings = Settings(unknown_field="value", another_unknown=123)
-        
+
         # Unknown fields should be ignored
         assert not hasattr(settings, "unknown_field")
         assert not hasattr(settings, "another_unknown")
@@ -169,7 +174,7 @@ class TestGetSettings:
         """Test that get_settings returns the same instance."""
         settings1 = get_settings()
         settings2 = get_settings()
-        
+
         assert settings1 is settings2
 
     def test_get_settings_with_reload(self, monkeypatch):

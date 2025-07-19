@@ -59,10 +59,12 @@ class DatabaseManager:
 
             # Only add PostgreSQL-specific pool settings for PostgreSQL
             if "postgresql" in db_url:
-                engine_kwargs.update({
-                    "pool_size": 10,
-                    "max_overflow": 20,
-                })
+                engine_kwargs.update(
+                    {
+                        "pool_size": 10,
+                        "max_overflow": 20,
+                    }
+                )
 
             self._engine = create_async_engine(db_url, **engine_kwargs)
         return self._engine
@@ -173,7 +175,9 @@ class DatabaseManager:
                 .values(
                     markdown_content=markdown_content,
                     status=status,
-                    processed_at=func.now() if status == DocumentStatus.COMPLETED else None,
+                    processed_at=func.now()
+                    if status == DocumentStatus.COMPLETED
+                    else None,
                 )
             )
 
@@ -187,9 +191,7 @@ class DatabaseManager:
         """Update document status."""
         async with self.get_session() as session:
             await session.execute(
-                update(Document)
-                .where(Document.id == document_id)
-                .values(status=status)
+                update(Document).where(Document.id == document_id).values(status=status)
             )
 
         logger.debug(f"Updated document status: {document_id} -> {status}")
@@ -229,9 +231,7 @@ class DatabaseManager:
 
         logger.debug(f"Added metadata to document: {document_id}")
 
-    async def get_document_metadata(
-        self, document_id: uuid.UUID
-    ) -> dict[str, str]:
+    async def get_document_metadata(self, document_id: uuid.UUID) -> dict[str, str]:
         """Get all metadata for a document."""
         async with self.get_session() as session:
             result = await session.execute(

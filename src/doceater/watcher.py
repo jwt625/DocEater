@@ -36,7 +36,7 @@ class FileEventHandler(FileSystemEventHandler):
 
     def on_moved(self, event: FileSystemEvent) -> None:
         """Handle file move events."""
-        if not event.is_directory and hasattr(event, 'dest_path'):
+        if not event.is_directory and hasattr(event, "dest_path"):
             self._queue_file_for_processing(Path(event.dest_path))
 
     def _queue_file_for_processing(self, file_path: Path) -> None:
@@ -147,8 +147,7 @@ class FileWatcher:
                 # Wait for a file to process (with timeout to check if still running)
                 try:
                     file_path = await asyncio.wait_for(
-                        self.event_handler.processing_queue.get(),
-                        timeout=1.0
+                        self.event_handler.processing_queue.get(), timeout=1.0
                     )
                 except TimeoutError:
                     continue
@@ -157,8 +156,7 @@ class FileWatcher:
                 if len(self._processing_tasks) >= self.settings.max_concurrent_files:
                     # Wait for at least one task to complete
                     done, pending = await asyncio.wait(
-                        self._processing_tasks,
-                        return_when=asyncio.FIRST_COMPLETED
+                        self._processing_tasks, return_when=asyncio.FIRST_COMPLETED
                     )
                     self._processing_tasks = pending
 
@@ -167,7 +165,9 @@ class FileWatcher:
                 self._processing_tasks.add(task)
 
                 # Clean up completed tasks
-                self._processing_tasks = {t for t in self._processing_tasks if not t.done()}
+                self._processing_tasks = {
+                    t for t in self._processing_tasks if not t.done()
+                }
 
             except Exception as e:
                 logger.error(f"Error in processing queue: {e}")

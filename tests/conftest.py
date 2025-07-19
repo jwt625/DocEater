@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import uuid
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any, AsyncGenerator, Generator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,7 +21,7 @@ from doceater.models import Base
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
@@ -28,7 +29,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 
 @pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
+def temp_dir() -> Generator[Path]:
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield Path(temp_dir)
@@ -52,50 +53,49 @@ def test_settings(temp_dir: Path) -> Settings:
 
 
 @pytest_asyncio.fixture
-async def test_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
+async def test_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine]:
     """Create a test database engine."""
     engine = create_async_engine(
         test_settings.database_url,
         echo=False,
         pool_pre_ping=True,
     )
-    
+
     # Create all tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     yield engine
-    
+
     # Clean up
     await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def test_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+async def test_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     """Create a test database session."""
     async_session = sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
-    
+
     async with async_session() as session:
         yield session
 
 
 @pytest_asyncio.fixture
-async def test_db_manager(test_settings: Settings, test_engine: AsyncEngine) -> AsyncGenerator[DatabaseManager, None]:
+async def test_db_manager(
+    test_settings: Settings, test_engine: AsyncEngine
+) -> AsyncGenerator[DatabaseManager]:
     """Create a test database manager."""
     db_manager = DatabaseManager(test_settings)
     # Override the engine with our test engine
     db_manager._engine = test_engine
     db_manager._session_factory = None  # Reset to use new engine
-    
+
     yield db_manager
-    
+
     # Clean up
     await db_manager.close()
-
-
-
 
 
 @pytest.fixture
@@ -128,7 +128,9 @@ def hello_world():
 def mock_docling() -> MagicMock:
     """Create a mock Docling converter."""
     mock = MagicMock()
-    mock.convert.return_value.document.export_to_markdown.return_value = "# Converted Document\n\nMocked content"
+    mock.convert.return_value.document.export_to_markdown.return_value = (
+        "# Converted Document\n\nMocked content"
+    )
     return mock
 
 
@@ -150,6 +152,7 @@ def sample_document_id() -> uuid.UUID:
 @pytest.fixture
 def create_test_file():
     """Factory fixture to create test files."""
+
     def _create_file(directory: Path, filename: str, content: bytes | str) -> Path:
         file_path = directory / filename
         if isinstance(content, str):
@@ -191,13 +194,13 @@ def small_pdf_file(sample_pdf_files: list[Path]) -> Path:
 # Async mock helpers
 class AsyncMockContext:
     """Helper for creating async context managers in mocks."""
-    
+
     def __init__(self, return_value: Any = None):
         self.return_value = return_value
-    
+
     async def __aenter__(self):
         return self.return_value
-    
+
     async def __aexit__(self, *_):
         return None
 

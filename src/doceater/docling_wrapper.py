@@ -70,10 +70,10 @@ class DoclingWrapper:
 
     def convert_document(self, file_path: Path | str) -> Any:
         """Convert a document to Docling format.
-        
+
         Args:
             file_path: Path to the document to convert
-            
+
         Returns:
             Docling conversion result
         """
@@ -102,7 +102,7 @@ class DoclingWrapper:
         self,
         file_path: Path | str,
         output_dir: Path | str | None = None,
-        image_mode: str = "referenced"
+        image_mode: str = "referenced",
     ) -> tuple[str, list[Path]]:
         """Convert document to Markdown with image extraction.
 
@@ -115,7 +115,9 @@ class DoclingWrapper:
             Tuple of (markdown_content, list_of_image_paths)
         """
         if not self.enable_image_extraction:
-            logger.warning("Image extraction is disabled. Use enable_image_extraction=True")
+            logger.warning(
+                "Image extraction is disabled. Use enable_image_extraction=True"
+            )
             return self.convert_to_markdown(file_path), []
 
         result = self.convert_document(file_path)
@@ -132,9 +134,13 @@ class DoclingWrapper:
 
         # Convert to markdown with image references
         if image_mode == "embedded":
-            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.EMBEDDED)
+            markdown_content = result.document.export_to_markdown(
+                image_mode=ImageRefMode.EMBEDDED
+            )
         else:
-            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.REFERENCED)
+            markdown_content = result.document.export_to_markdown(
+                image_mode=ImageRefMode.REFERENCED
+            )
 
         logger.info(f"Extracted {len(extracted_images)} images to {output_dir}")
         return markdown_content, extracted_images
@@ -143,7 +149,7 @@ class DoclingWrapper:
         self,
         file_path: Path | str,
         temp_dir: Path | str | None = None,
-        image_mode: str = "referenced"
+        image_mode: str = "referenced",
     ) -> tuple[str, list[Path]]:
         """Convert document to Markdown with temporary image extraction for storage.
 
@@ -159,7 +165,9 @@ class DoclingWrapper:
             Tuple of (markdown_content, list_of_temp_image_paths)
         """
         if not self.enable_image_extraction:
-            logger.warning("Image extraction is disabled. Use enable_image_extraction=True")
+            logger.warning(
+                "Image extraction is disabled. Use enable_image_extraction=True"
+            )
             return self.convert_to_markdown(file_path), []
 
         result = self.convert_document(file_path)
@@ -167,6 +175,7 @@ class DoclingWrapper:
         # Set up temporary directory for images
         if temp_dir is None:
             import tempfile
+
             temp_dir = Path(tempfile.mkdtemp(prefix="doceater_images_"))
         else:
             temp_dir = Path(temp_dir)
@@ -177,11 +186,17 @@ class DoclingWrapper:
 
         # Convert to markdown with image references
         if image_mode == "embedded":
-            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.EMBEDDED)
+            markdown_content = result.document.export_to_markdown(
+                image_mode=ImageRefMode.EMBEDDED
+            )
         else:
-            markdown_content = result.document.export_to_markdown(image_mode=ImageRefMode.REFERENCED)
+            markdown_content = result.document.export_to_markdown(
+                image_mode=ImageRefMode.REFERENCED
+            )
 
-        logger.info(f"Extracted {len(extracted_images)} images to temporary directory {temp_dir}")
+        logger.info(
+            f"Extracted {len(extracted_images)} images to temporary directory {temp_dir}"
+        )
         return markdown_content, extracted_images
 
     def get_image_metadata_from_result(self, conversion_result: Any) -> dict[str, Any]:
@@ -235,7 +250,9 @@ class DoclingWrapper:
             try:
                 if isinstance(element, TableItem):
                     table_counter += 1
-                    element_image_filename = output_dir / f"{doc_filename}-table-{table_counter}.png"
+                    element_image_filename = (
+                        output_dir / f"{doc_filename}-table-{table_counter}.png"
+                    )
                     with element_image_filename.open("wb") as fp:
                         element.get_image(conversion_result.document).save(fp, "PNG")
                     extracted_images.append(element_image_filename)
@@ -243,7 +260,9 @@ class DoclingWrapper:
 
                 elif isinstance(element, PictureItem):
                     picture_counter += 1
-                    element_image_filename = output_dir / f"{doc_filename}-picture-{picture_counter}.png"
+                    element_image_filename = (
+                        output_dir / f"{doc_filename}-picture-{picture_counter}.png"
+                    )
                     with element_image_filename.open("wb") as fp:
                         element.get_image(conversion_result.document).save(fp, "PNG")
                     extracted_images.append(element_image_filename)
@@ -263,14 +282,14 @@ class DoclingWrapper:
         """
         # Based on actual Docling InputFormat enum
         return [
-            ".pdf",      # PDF documents
-            ".docx",     # Microsoft Word
-            ".pptx",     # Microsoft PowerPoint
-            ".html",     # HTML documents
-            ".md",       # Markdown
-            ".csv",      # CSV files
-            ".xlsx",     # Microsoft Excel
-            ".xml",      # XML (USPTO/JATS formats)
+            ".pdf",  # PDF documents
+            ".docx",  # Microsoft Word
+            ".pptx",  # Microsoft PowerPoint
+            ".html",  # HTML documents
+            ".md",  # Markdown
+            ".csv",  # CSV files
+            ".xlsx",  # Microsoft Excel
+            ".xml",  # XML (USPTO/JATS formats)
             # Note: JSON, TXT not directly supported by Docling
             # IMAGE and AUDIO formats also supported but not included here
         ]
