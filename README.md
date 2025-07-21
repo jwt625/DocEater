@@ -151,7 +151,7 @@ uv run mypy src/
 
 ### Testing
 
-DocEater has comprehensive testing infrastructure with 49 tests covering all core components:
+DocEater has comprehensive testing infrastructure with 93 tests covering all core components:
 
 #### Running Tests
 
@@ -171,11 +171,13 @@ uv run pytest -v
 
 #### Test Coverage
 
-- **Configuration**: 84% coverage - Environment variables, validation, file loading
-- **Database**: 92% coverage - CRUD operations, metadata, logging
-- **Models**: 100% coverage - SQLAlchemy models, enums, relationships
-- **Processor**: 91% coverage - File processing, Docling integration, error handling
-- **Overall**: 48% coverage (excellent for core components)
+- **Configuration**: 83% coverage - Environment variables, validation, file loading
+- **Database**: 76% coverage - CRUD operations, metadata, logging
+- **Models**: 95% coverage - SQLAlchemy models, enums, relationships
+- **Processor**: 75% coverage - File processing, Docling integration, error handling
+- **File Watcher**: 96% coverage - Event handling, debouncing, queue processing, lifecycle management
+- **Image Storage**: 85% coverage - Image extraction, storage, metadata management
+- **Overall**: 58% coverage (excellent for core components)
 
 #### Test Infrastructure
 
@@ -194,7 +196,9 @@ tests/
 ├── test_config.py        # Configuration management tests
 ├── test_models.py        # Database model tests
 ├── test_database.py      # Database operation tests
-└── test_processor.py     # Document processor tests
+├── test_processor.py     # Document processor tests
+├── test_watcher.py       # File watcher functionality tests
+└── test_image_storage.py # Image storage and management tests
 ```
 
 See [RFD 002](docs/RFD-002-testing-infrastructure.md) for detailed testing infrastructure documentation.
@@ -223,13 +227,16 @@ See [DOCLING_INTEGRATION.md](DOCLING_INTEGRATION.md) for detailed information.
 
 ### Completed ✅
 - [x] Core MVP implementation (file watching, processing, storage)
-- [x] Comprehensive testing infrastructure (49 tests, 48% coverage)
+- [x] Comprehensive testing infrastructure (93 tests, 58% coverage)
 - [x] CLI interface with all planned commands
 - [x] Database operations with PostgreSQL support
 - [x] Document processing with local Docling integration and formula enrichment
+- [x] File watcher component with comprehensive tests (96% coverage)
+- [x] Image extraction and storage system with database integration
+- [x] Error handling and partial content recovery
+- [x] Type safety with full mypy compliance
 
-### Planned 🚧
-- [ ] File watcher component tests
+### In Progress 🚧
 - [ ] CLI command tests
 - [ ] Integration tests with real PDF files
 - [ ] Performance and stress testing
@@ -240,6 +247,7 @@ See [DOCLING_INTEGRATION.md](DOCLING_INTEGRATION.md) for detailed information.
 - [ ] Web UI for document browsing
 - [ ] Support for additional file formats
 - [ ] LLM integration for document analysis
+- [ ] Git-like versioning system for document updates
 
 ## License
 
