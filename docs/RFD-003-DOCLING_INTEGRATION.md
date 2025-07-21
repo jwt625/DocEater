@@ -1,7 +1,7 @@
 # Docling Integration
 
 **Status:** ✅ **IMPLEMENTED AND TESTED**
-**Updated:** 2025-01-17
+**Updated:** 2025-07-17
 
 This document describes how DocEater integrates with the official Docling library for enhanced document processing.
 

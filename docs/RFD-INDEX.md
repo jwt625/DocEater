@@ -9,6 +9,9 @@ This document provides an index of all Request for Discussion (RFD) documents fo
 | [000](RFD-000-implementation-plan.md) | Implementation Plan | Original Author | 2024 | Implemented |
 | [001](RFD-001-mvp-plan.md) | MVP Plan | Original Author | 2024 | Implemented |
 | [002](RFD-002-testing-infrastructure.md) | Testing Infrastructure Implementation | Augment Agent | 2025-07-15 | Implemented |
+| [003](RFD-003-DOCLING_INTEGRATION.md) | Docling Integration | Original Author | 2024 | Implemented |
+| [004](RFD-004-IMAGE_STORAGE.md) | Image Storage System | Original Author | 2024 | Implemented |
+| [005](RFD-005-development-roadmap.md) | Development Roadmap and Phase Planning | Augment Agent | 2025-07-20 | Draft |
 
 ## RFD Status Definitions
 

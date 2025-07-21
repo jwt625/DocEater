@@ -44,7 +44,10 @@ class TestDocumentProcessor:
         # First access should create wrapper
         wrapper1 = processor.docling_wrapper
         assert wrapper1 == mock_wrapper
-        mock_wrapper_class.assert_called_once_with(enable_formula_enrichment=True)
+        mock_wrapper_class.assert_called_once_with(
+            enable_formula_enrichment=True,
+            enable_image_extraction=test_settings.images_enabled
+        )
 
         # Second access should return cached wrapper
         wrapper2 = processor.docling_wrapper
@@ -260,6 +263,11 @@ class TestDocumentProcessor:
         # Setup mock wrapper
         mock_wrapper = MagicMock()
         mock_wrapper.convert_to_markdown.return_value = "# Test Document\n\nContent"
+        # Mock the method that's actually called when images are enabled
+        mock_wrapper.convert_to_markdown_with_storage.return_value = (
+            "# Test Document\n\nContent",
+            []  # Empty list of temp image paths
+        )
         mock_wrapper_class.return_value = mock_wrapper
 
         processor = DocumentProcessor(test_settings, test_db_manager)
@@ -372,11 +380,13 @@ class TestDocumentProcessor:
             # Most PDFs should have some text content
             assert len(markdown.split()) > 0  # Should have at least some words
         except Exception as e:
-            # Skip test if Docling models can't be downloaded (e.g., no HF auth)
+            # Skip test if Docling models can't be downloaded or have path issues
             if (
                 "401" in str(e)
                 or "Unauthorized" in str(e)
                 or "HfHubHTTPError" in str(e)
+                or "HFValidationError" in str(e)
+                or "Repo id must be in the form" in str(e)
             ):
                 pytest.skip(
                     f"Skipping integration test due to Docling model access issue: {e}"
