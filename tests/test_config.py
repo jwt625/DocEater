@@ -18,7 +18,8 @@ class TestSettings:
         """Test default settings values."""
         settings = Settings()
 
-        assert settings.database_url == "postgresql://localhost:5432/doceater"
+        # The actual default includes asyncpg driver and credentials from .env
+        assert settings.database_url == "postgresql+asyncpg://postgres:postgres@localhost:5432/doceater"
         assert settings.watch_folder == str(Path.home() / "Downloads")
         assert settings.watch_recursive is True
         assert settings.max_file_size_mb == 100

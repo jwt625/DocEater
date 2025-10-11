@@ -74,6 +74,7 @@ class FileWatcher:
         self.observer: Observer | None = None
         self.event_handler: FileEventHandler | None = None
         self._processing_tasks: set[asyncio.Task[Any]] = set()
+        self._queue_task: asyncio.Task[None] | None = None
         self._running = False
 
     async def start_watching(self) -> None:
@@ -105,7 +106,7 @@ class FileWatcher:
         self._running = True
 
         # Start processing queue consumer
-        asyncio.create_task(self._process_queue())
+        self._queue_task = asyncio.create_task(self._process_queue())
 
         logger.info("File watcher started successfully")
 
@@ -123,6 +124,15 @@ class FileWatcher:
             self.observer.stop()
             self.observer.join()
             self.observer = None
+
+        # Cancel the queue processing task
+        if self._queue_task and not self._queue_task.done():
+            self._queue_task.cancel()
+            try:
+                await self._queue_task
+            except asyncio.CancelledError:
+                pass
+            self._queue_task = None
 
         # Cancel all processing tasks
         for task in self._processing_tasks:

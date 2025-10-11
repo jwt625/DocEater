@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -37,9 +38,9 @@ def temp_dir() -> Generator[Path]:
 
 @pytest.fixture
 def test_settings(temp_dir: Path) -> Settings:
-    """Create test settings with temporary directories."""
+    """Create test settings with PostgreSQL test database."""
     return Settings(
-        database_url="sqlite+aiosqlite:///:memory:",
+        database_url="postgresql+asyncpg://postgres:postgres@localhost:5432/doceater",
         watch_folder=str(temp_dir),
         watch_recursive=True,
         max_file_size_mb=50,  # Increased to handle larger test PDFs
@@ -49,21 +50,24 @@ def test_settings(temp_dir: Path) -> Settings:
         max_concurrent_files=2,
         processing_delay_seconds=0.1,
         log_level="DEBUG",
+        images_base_path=str(temp_dir / "images"),
+        temp_upload_dir=str(temp_dir / "temp"),
     )
 
 
 @pytest_asyncio.fixture
 async def test_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine]:
-    """Create a test database engine."""
+    """Create a test database engine with PostgreSQL."""
     engine = create_async_engine(
         test_settings.database_url,
         echo=False,
         pool_pre_ping=True,
     )
 
-    # Create all tables
+    # For PostgreSQL, we don't need to create tables as they're managed by Alembic
+    # Just verify the connection works
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("SELECT 1"))
 
     yield engine
 
@@ -72,7 +76,28 @@ async def test_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine]:
 
 
 @pytest_asyncio.fixture
-async def test_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
+async def clean_database(test_engine: AsyncEngine) -> AsyncGenerator[None]:
+    """Clean the database before each test."""
+    # Clean up before the test
+    async with test_engine.begin() as conn:
+        # Truncate all tables in reverse dependency order
+        await conn.execute(text("TRUNCATE TABLE image_embeddings CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE text_embeddings CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE document_images CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE documents CASCADE"))
+
+    yield
+
+    # Clean up after the test as well
+    async with test_engine.begin() as conn:
+        await conn.execute(text("TRUNCATE TABLE image_embeddings CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE text_embeddings CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE document_images CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE documents CASCADE"))
+
+
+@pytest_asyncio.fixture
+async def test_session(test_engine: AsyncEngine, clean_database) -> AsyncGenerator[AsyncSession]:
     """Create a test database session."""
     async_session = sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
@@ -84,7 +109,7 @@ async def test_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]
 
 @pytest_asyncio.fixture
 async def test_db_manager(
-    test_settings: Settings, test_engine: AsyncEngine
+    test_settings: Settings, test_engine: AsyncEngine, clean_database
 ) -> AsyncGenerator[DatabaseManager]:
     """Create a test database manager."""
     db_manager = DatabaseManager(test_settings)

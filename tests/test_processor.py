@@ -387,6 +387,8 @@ class TestDocumentProcessor:
                 or "HfHubHTTPError" in str(e)
                 or "HFValidationError" in str(e)
                 or "Repo id must be in the form" in str(e)
+                or "artifacts_path" in str(e)
+                or "must point to a folder containing all models" in str(e)
             ):
                 pytest.skip(
                     f"Skipping integration test due to Docling model access issue: {e}"
@@ -416,6 +418,8 @@ class TestDocumentProcessor:
                         "401" in log.message
                         or "Unauthorized" in log.message
                         or "HfHubHTTPError" in log.message
+                        or "artifacts_path" in log.message
+                        or "must point to a folder containing all models" in log.message
                     ):
                         pytest.skip(
                             "Skipping integration test due to Docling model access issue"

@@ -198,17 +198,21 @@ class TestFileWatcher:
         with patch('doceater.watcher.Observer') as mock_observer_class:
             mock_observer = MagicMock()
             mock_observer_class.return_value = mock_observer
-            
-            await file_watcher.start_watching()
-            
-            # Verify watcher state
-            assert file_watcher._running is True
-            assert file_watcher.observer is mock_observer
-            assert file_watcher.event_handler is not None
-            
-            # Verify observer setup
-            mock_observer.schedule.assert_called_once()
-            mock_observer.start.assert_called_once()
+
+            try:
+                await file_watcher.start_watching()
+
+                # Verify watcher state
+                assert file_watcher._running is True
+                assert file_watcher.observer is mock_observer
+                assert file_watcher.event_handler is not None
+
+                # Verify observer setup
+                mock_observer.schedule.assert_called_once()
+                mock_observer.start.assert_called_once()
+            finally:
+                # Clean up to prevent warnings
+                await file_watcher.stop_watching()
 
     @pytest.mark.asyncio
     async def test_stop_watching_not_running(self, file_watcher: FileWatcher):

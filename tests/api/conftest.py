@@ -18,9 +18,9 @@ from doceater.database import DatabaseManager
 
 @pytest.fixture
 def api_test_settings(temp_dir: Path) -> Settings:
-    """Create test settings for API testing."""
+    """Create test settings for API testing with PostgreSQL."""
     return Settings(
-        database_url="sqlite+aiosqlite:///:memory:",
+        database_url="postgresql+asyncpg://postgres:postgres@localhost:5432/doceater",
         # API settings
         api_host="127.0.0.1",
         api_port=8000,
@@ -46,6 +46,7 @@ def api_test_settings(temp_dir: Path) -> Settings:
         supported_extensions=[".pdf"],
         exclude_patterns=[".*", "~*", "*.tmp"],
         log_level="DEBUG",
+        images_base_path=str(temp_dir / "images"),
     )
 
 

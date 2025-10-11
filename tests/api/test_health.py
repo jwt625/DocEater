@@ -46,7 +46,8 @@ class TestHealthEndpoint:
 
             # Mock database connection failure
             failed_context = AsyncContextManagerMock(side_effect=Exception("Database connection failed"))
-            mock_db_manager.get_session.return_value = failed_context
+            # Use a lambda to return the context manager directly, not wrapped in AsyncMock
+            mock_db_manager.get_session = lambda: failed_context
 
             response = test_client.get("/api/v1/health")
 
@@ -68,10 +69,9 @@ class TestHealthEndpoint:
 
             # Mock successful database connection with proper async context manager
             mock_session = AsyncMock()
-            mock_context_manager = AsyncMock()
-            mock_context_manager.__aenter__.return_value = mock_session
-            mock_context_manager.__aexit__.return_value = None
-            mock_db_manager.get_session.return_value = mock_context_manager
+            mock_context_manager = AsyncContextManagerMock(return_value=mock_session)
+            # Use a lambda to return the context manager directly, not wrapped in AsyncMock
+            mock_db_manager.get_session = lambda: mock_context_manager
             mock_session.execute.return_value = None
 
             response = test_client.get("/api/v1/health", headers=auth_headers)
