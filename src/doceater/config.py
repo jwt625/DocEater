@@ -110,6 +110,35 @@ class Settings(BaseSettings):
         default=None, description="PID file path for daemon mode"
     )
 
+    # API settings
+    api_host: str = Field(default="127.0.0.1", description="API server host")
+    api_port: int = Field(default=8000, description="API server port")
+    api_workers: int = Field(default=1, description="Number of API workers")
+    api_reload: bool = Field(default=False, description="Enable auto-reload in development")
+
+    # Authentication settings
+    require_auth: bool = Field(default=True, description="Require authentication for API access")
+    allow_anonymous_health: bool = Field(default=True, description="Allow anonymous health checks")
+    jwt_secret_key: str = Field(default="", description="JWT secret key (auto-generated if empty)")
+    jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
+    jwt_expiration_hours: int = Field(default=24, description="JWT token expiration in hours")
+    api_keys: str = Field(default="", description="API keys in format 'key1:user1,key2:user2'")
+
+    # File upload settings
+    upload_max_size_mb: int = Field(default=100, description="Maximum upload size in MB")
+    upload_chunk_size_kb: int = Field(default=64, description="Upload chunk size in KB")
+    upload_timeout_seconds: int = Field(default=300, description="Upload timeout in seconds")
+    temp_upload_dir: str = Field(
+        default_factory=lambda: str(Path.home() / "doceater_data" / "temp"),
+        description="Temporary upload directory"
+    )
+    cleanup_temp_files: bool = Field(default=True, description="Auto-cleanup temp files")
+
+    # CORS settings
+    cors_origins: str = Field(default="*", description="CORS allowed origins (comma-separated)")
+    cors_methods: str = Field(default="GET,POST,PUT,DELETE", description="CORS allowed methods")
+    cors_headers: str = Field(default="*", description="CORS allowed headers")
+
     @field_validator("watch_folder")
     @classmethod
     def validate_watch_folder(cls, v: str) -> str:

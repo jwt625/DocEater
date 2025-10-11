@@ -101,6 +101,39 @@ def init(
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Host to bind the server to"),
+    port: int = typer.Option(8000, help="Port to bind the server to"),
+    workers: int = typer.Option(1, help="Number of worker processes"),
+    reload: bool = typer.Option(False, help="Enable auto-reload for development"),
+):
+    """Start the DocEater API server."""
+    import uvicorn
+    from .api.main import app as fastapi_app
+
+    console.print(f"🚀 Starting DocEater API server on {host}:{port}")
+
+    if reload:
+        console.print("⚠️  Auto-reload enabled (development mode)")
+
+    try:
+        uvicorn.run(
+            "doceater.api.main:app",
+            host=host,
+            port=port,
+            workers=workers,
+            reload=reload,
+            access_log=True,
+            log_level="info",
+        )
+    except KeyboardInterrupt:
+        console.print("\n🛑 Server stopped by user")
+    except Exception as e:
+        console.print(f"❌ Failed to start server: {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
 def watch(
     folder: str = typer.Argument(None, help="Folder to watch (default from config)"),
     process_existing: bool = typer.Option(
