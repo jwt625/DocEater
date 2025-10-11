@@ -36,7 +36,7 @@ def validate_file_size(file: UploadFile, max_size_mb: int) -> None:
         max_size_bytes = max_size_mb * 1024 * 1024
         if size > max_size_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=f"File size ({size} bytes) exceeds maximum allowed size ({max_size_mb} MB)"
             )
 
@@ -98,8 +98,14 @@ async def upload_document(
     
     # Save uploaded file
     temp_dir = Path(settings.temp_upload_dir)
-    temp_file = await save_upload_file(file, temp_dir)
-    
+    try:
+        temp_file = await save_upload_file(file, temp_dir)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save uploaded file: {str(e)}"
+        )
+
     try:
         # Create document record
         db_manager = get_db_manager()

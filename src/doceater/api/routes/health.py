@@ -1,15 +1,15 @@
 """Health check and system status endpoints."""
 
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 
 from ...config import get_settings
 from ...database import get_db_manager
-from ..auth import get_current_user_optional, TokenData
+from ..auth import get_current_user, get_current_user_optional, TokenData
 from ..models.responses import HealthResponse, StatsResponse
 
 router = APIRouter()
@@ -64,7 +64,7 @@ async def health_check(
     
     return HealthResponse(
         status=overall_status,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         version="1.0.0",
         database=db_status,
         embedding_model=model_status,
@@ -150,4 +150,7 @@ async def system_stats(
             
     except Exception as e:
         logger.error(f"Failed to get system stats: {e}")
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve system statistics"
+        )

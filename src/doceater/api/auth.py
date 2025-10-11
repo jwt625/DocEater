@@ -1,7 +1,7 @@
 """Authentication and authorization for DocEater API."""
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -72,7 +72,7 @@ def create_jwt_token(user_id: str, username: str, scopes: list[str] = None) -> s
     if scopes is None:
         scopes = ["read", "write"]
     
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     exp = now + timedelta(hours=auth_config.jwt_expiration_hours)
     
     payload = {
@@ -104,7 +104,7 @@ def verify_jwt_token(token: str) -> TokenData:
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -139,8 +139,8 @@ async def get_current_user(
             user_id="anonymous",
             username="anonymous",
             scopes=["read", "write"],
-            exp=datetime.utcnow() + timedelta(hours=24),
-            iat=datetime.utcnow(),
+            exp=datetime.now(timezone.utc) + timedelta(hours=24),
+            iat=datetime.now(timezone.utc),
         )
     
     # No credentials provided
@@ -166,8 +166,8 @@ async def get_current_user(
             user_id=user_id,
             username=user_id,
             scopes=["read", "write"],
-            exp=datetime.utcnow() + timedelta(hours=24),
-            iat=datetime.utcnow(),
+            exp=datetime.now(timezone.utc) + timedelta(hours=24),
+            iat=datetime.now(timezone.utc),
         )
     except HTTPException:
         pass
