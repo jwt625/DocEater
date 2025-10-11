@@ -1,9 +1,7 @@
 """Document management endpoints."""
 
-import asyncio
-import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -12,14 +10,10 @@ from loguru import logger
 from ...config import get_settings
 from ...database import get_db_manager
 from ...models import Document, DocumentStatus
-from ...processor import DocumentProcessor
 from ..auth import get_current_user, require_write, TokenData
-from ..models.requests import DocumentUploadRequest, ReprocessRequest
 from ..models.responses import (
     DocumentListResponse,
     DocumentResponse,
-    EmbeddingResponse,
-    ProcessingStatusResponse,
 )
 
 router = APIRouter()
@@ -46,8 +40,7 @@ async def save_upload_file(upload_file: UploadFile, temp_dir: Path) -> Path:
     # Create temp directory if it doesn't exist
     temp_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create temporary file with original extension
-    suffix = Path(upload_file.filename or "").suffix
+    # Create temporary file with original filename
     temp_file = temp_dir / f"upload_{upload_file.filename}"
     
     try:
@@ -132,7 +125,7 @@ async def upload_document(
         logger.info(f"Starting processing for document {document.id}")
         
         # Return document response
-        return DocumentResponse(
+        response = DocumentResponse(
             id=document.id,
             filename=document.filename,
             file_size=document.file_size,
@@ -147,11 +140,25 @@ async def upload_document(
             image_count=0,
             metadata={}
         )
-        
+
+        # Clean up temp file after successful processing if configured
+        if settings.cleanup_temp_files and temp_file.exists():
+            try:
+                temp_file.unlink()
+                logger.debug(f"Cleaned up temporary file: {temp_file}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temporary file {temp_file}: {cleanup_error}")
+
+        return response
+
     except Exception as e:
         # Clean up temp file on error
         if temp_file.exists():
-            temp_file.unlink()
+            try:
+                temp_file.unlink()
+                logger.debug(f"Cleaned up temporary file after error: {temp_file}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temporary file after error {temp_file}: {cleanup_error}")
         logger.error(f"Failed to process uploaded document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -1,17 +1,13 @@
 """Search and retrieval endpoints."""
 
-import time
-from typing import List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 
 from ...config import get_settings
-from ...database import get_db_manager
 from ..auth import get_current_user, TokenData
 from ..models.requests import SearchRequest, SimilarSearchRequest
-from ..models.responses import SearchResponse, SearchResult
+from ..models.responses import SearchResponse
 
 router = APIRouter()
 

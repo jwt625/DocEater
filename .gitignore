@@ -176,3 +176,10 @@ external/
 # Test files
 test_files/
 sample_docs/
+
+# Temporary directories and files
+test_temp/
+doceater_data/
+*.db
+*.sqlite
+*.sqlite3

@@ -3,7 +3,7 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from loguru import logger
 

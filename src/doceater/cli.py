@@ -109,7 +109,6 @@ def serve(
 ):
     """Start the DocEater API server."""
     import uvicorn
-    from .api.main import app as fastapi_app
 
     console.print(f"🚀 Starting DocEater API server on {host}:{port}")
 

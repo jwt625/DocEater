@@ -61,6 +61,50 @@ class TestDocumentUpload:
         assert response_data["status"] == "processing"
         assert "id" in response_data
 
+    def test_upload_pdf_cleanup_temp_file(
+        self,
+        test_client: TestClient,
+        auth_headers: dict[str, str],
+        small_test_pdf: bytes,
+        mock_db_manager: AsyncMock,
+        temp_upload_dir: Path,
+    ):
+        """Test that temporary files are cleaned up after successful upload when cleanup_temp_files=True."""
+        # Mock database operations
+        mock_document = MagicMock(spec=Document)
+        mock_document.id = uuid4()
+        mock_document.filename = "test_cleanup.pdf"
+        mock_document.file_size = len(small_test_pdf)
+        mock_document.mime_type = "application/pdf"
+        mock_document.status = DocumentStatus.PROCESSING
+        mock_document.created_at = "2025-10-11T10:00:00Z"
+        mock_document.updated_at = "2025-10-11T10:00:00Z"
+        mock_document.markdown_content = None
+
+        mock_db_manager.create_document.return_value = mock_document
+
+        # Prepare file upload
+        files = {"file": ("test_cleanup.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
+        data = {"description": "Test cleanup"}
+
+        # Verify temp file doesn't exist before upload
+        temp_file_path = temp_upload_dir / "upload_test_cleanup.pdf"
+        assert not temp_file_path.exists()
+
+        # Make request
+        response = test_client.post(
+            "/api/v1/documents/upload",
+            files=files,
+            data=data,
+            headers=auth_headers,
+        )
+
+        # Verify response is successful
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify temp file was cleaned up (since cleanup_temp_files=True in test config)
+        assert not temp_file_path.exists(), "Temporary file should be cleaned up after successful upload"
+
     def test_upload_pdf_unauthenticated(
         self,
         test_client: TestClient,

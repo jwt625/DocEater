@@ -2,7 +2,6 @@
 
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError

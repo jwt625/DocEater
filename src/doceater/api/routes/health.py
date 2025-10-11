@@ -95,7 +95,7 @@ async def system_stats(
     try:
         async with db_manager.get_session() as session:
             # Document statistics
-            from ...models import Document, DocumentStatus
+            from ...models import DocumentStatus
             
             # Total documents
             result = await session.execute("SELECT COUNT(*) FROM documents")
