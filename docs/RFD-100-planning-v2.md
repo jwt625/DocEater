@@ -1,7 +1,7 @@
 # Design Doc: Open-Source PDF + Image Embeddings for RAG
 
-**Author:** Wentao  
-**Date:** 2025-10-09  
+**Author:** Wentao
+**Date:** 2025-10-09
 **Status:** Draft → Adopt
 
 ---
@@ -57,32 +57,32 @@ Rationale: E5-V preserves simplicity (one model, one index, one score) while mee
 
 ## 6) Target Architecture
 
-1. **Parse:**  
-   - PDF → **Docling** (preferred for HTML/Markdown + coords) or **Markit**.  
+1. **Parse:**
+   - PDF → **Docling** (preferred for HTML/Markdown + coords) or **Markit**.
    - Produce structured blocks: `paragraphs`, `headings`, `tables`, `captions`, `figures` (image files), each with `doc_id`, `page`, `bbox`.
 
-2. **Preprocess:**  
-   - **Chunk text** by structure (H1/H2, paragraphs, table boundaries).  
-   - Extract figures to PNG/JPG; link to nearest caption.  
+2. **Preprocess:**
+   - **Chunk text** by structure (H1/H2, paragraphs, table boundaries).
+   - Extract figures to PNG/JPG; link to nearest caption.
    - Optional OCR on figures/screenshots to create auxiliary text.
 
-3. **Embed (E5-V):**  
-   - Text chunks → vectors.  
-   - Images (raw pixels) → vectors.  
+3. **Embed (E5-V):**
+   - Text chunks → vectors.
+   - Images (raw pixels) → vectors.
    - (Optional) Caption/OCR text → vectors (stored as separate items).
 
-4. **Index:**  
-   - **FAISS** (HNSW) *or* **LanceDB**.  
-   - Single index (cosine over L2-normalized vectors).  
+4. **Index:**
+   - **FAISS** (HNSW) *or* **LanceDB**.
+   - Single index (cosine over L2-normalized vectors).
    - Store rich metadata: `doc_id`, `page`, `bbox`, `section`, `kind={text|image|caption}`, `path`.
 
-5. **Query:**  
-   - Incoming user text → E5-V query vector.  
-   - Search unified index → top-k mixed (text + image) hits.  
+5. **Query:**
+   - Incoming user text → E5-V query vector.
+   - Search unified index → top-k mixed (text + image) hits.
    - Optional lightweight **cross-encoder** re-rank or LLM semantic re-rank on top-k.
 
-6. **Answering:**  
-   - Render previews using `page` + `bbox`.  
+6. **Answering:**
+   - Render previews using `page` + `bbox`.
    - Provide LLM with retrieved **mixed context** (text spans + image captions/OCR text) for grounded responses.
 
 ---
@@ -105,9 +105,9 @@ Rationale: E5-V preserves simplicity (one model, one index, one score) while mee
 - Keep a **metadata store** (e.g., SQLite/Parquet within LanceDB) to join vector IDs to source info.
 
 ### 7.4 Scoring
-- **Unified (default):** `score = cosine(q_vec, item_vec)` across both text and images.  
-- **Late fusion (fallback stack):**  
-  `score = w_text * cosine(bge(q), bge(text)) + w_img * cosine(siglip(q), siglip(img))`  
+- **Unified (default):** `score = cosine(q_vec, item_vec)` across both text and images.
+- **Late fusion (fallback stack):**
+  `score = w_text * cosine(bge(q), bge(text)) + w_img * cosine(siglip(q), siglip(img))`
   Tune `w_text`, `w_img` on a labeled dev set.
 
 ---
@@ -116,10 +116,10 @@ Rationale: E5-V preserves simplicity (one model, one index, one score) while mee
 
 - **Offline eval set:** 100–300 text queries with gold references to pages/figures.
 - **Metrics:** Recall@k (k∈{5,10,20}), nDCG@10, MRR, time/query, GPU utilization.
-- **Ablations:**  
-  - Text-only vs text+image,  
-  - With/without captions/OCR,  
-  - Chunk sizes & overlap,  
+- **Ablations:**
+  - Text-only vs text+image,
+  - With/without captions/OCR,
+  - Chunk sizes & overlap,
   - FAISS HNSW parameters (M, efSearch).
 - **Regression suite:** Lock model checkpoint & preprocessing to detect drift.
 
@@ -127,9 +127,9 @@ Rationale: E5-V preserves simplicity (one model, one index, one score) while mee
 
 ## 9) Operational Considerations
 
-- **Hardware:** 16–24 GB GPU recommended for E5-V batch inference.  
-- **Throughput:** Batch encode (32–128), pre-compute & persist vectors; incremental indexing on new docs.  
-- **Repro:** Pin model revision/checkpoint; record preprocessor versions (Docling/Markit).  
+- **Hardware:** 16–24 GB GPU recommended for E5-V batch inference.
+- **Throughput:** Batch encode (32–128), pre-compute & persist vectors; incremental indexing on new docs.
+- **Repro:** Pin model revision/checkpoint; record preprocessor versions (Docling/Markit).
 - **Privacy:** All local/offline; no external calls.
 
 ---
@@ -160,19 +160,19 @@ Rationale: E5-V preserves simplicity (one model, one index, one score) while mee
 
 ## 11) Risks & Mitigations
 
-- **R-01 Image-only content under-retrieved** → Add captions/OCR as auxiliary text items; keep both image and caption embeddings.  
-- **R-02 Index bloat from near-duplicates** → Perceptual hash dedup; collapse similar vectors by doc/page.  
-- **R-03 Latency** → Increase HNSW efSearch gradually; pre-warm caches; batch encode; optional GPU FAISS.  
+- **R-01 Image-only content under-retrieved** → Add captions/OCR as auxiliary text items; keep both image and caption embeddings.
+- **R-02 Index bloat from near-duplicates** → Perceptual hash dedup; collapse similar vectors by doc/page.
+- **R-03 Latency** → Increase HNSW efSearch gradually; pre-warm caches; batch encode; optional GPU FAISS.
 - **R-04 Mis-grounding** → Always carry `page` + `bbox`; highlight exact region in UI.
 
 ---
 
 ## 12) Roadmap / Next Steps
 
-1. **Prototype** E5-V pipeline on 5–10 representative PDFs.  
-2. Build **dev eval set** (≥150 labeled queries; include figure-heavy questions).  
-3. Tune **chunking** & **HNSW** params; decide on captions/OCR inclusion.  
-4. Add **optional re-ranker** (cross-encoder) if needed for precision@5.  
+1. **Prototype** E5-V pipeline on 5–10 representative PDFs.
+2. Build **dev eval set** (≥150 labeled queries; include figure-heavy questions).
+3. Tune **chunking** & **HNSW** params; decide on captions/OCR inclusion.
+4. Add **optional re-ranker** (cross-encoder) if needed for precision@5.
 5. Productionize: streaming index updates, monitoring, regression tests.
 
 ---

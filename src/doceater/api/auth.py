@@ -1,8 +1,7 @@
 """Authentication and authorization for DocEater API."""
 
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
@@ -14,7 +13,7 @@ from ..config import get_settings
 
 class TokenData(BaseModel):
     """Token payload data."""
-    
+
     user_id: str
     username: str
     scopes: list[str] = []
@@ -24,16 +23,16 @@ class TokenData(BaseModel):
 
 class AuthConfig(BaseModel):
     """Authentication configuration."""
-    
+
     # JWT settings
     jwt_secret_key: str = secrets.token_urlsafe(32)
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
-    
+
     # API key settings
     api_key_header: str = "X-API-Key"
     api_keys: dict[str, str] = {}  # api_key -> user_id mapping
-    
+
     # Security settings
     require_auth: bool = True
     allow_anonymous_health: bool = True
@@ -49,21 +48,31 @@ security = HTTPBearer(auto_error=False)
 def init_auth_config(settings) -> None:
     """Initialize authentication configuration from settings."""
     global auth_config
-    
+
     # Load from environment or use defaults
-    auth_config.jwt_secret_key = getattr(settings, 'jwt_secret_key', auth_config.jwt_secret_key)
-    auth_config.jwt_algorithm = getattr(settings, 'jwt_algorithm', auth_config.jwt_algorithm)
-    auth_config.jwt_expiration_hours = getattr(settings, 'jwt_expiration_hours', auth_config.jwt_expiration_hours)
-    auth_config.require_auth = getattr(settings, 'require_auth', auth_config.require_auth)
-    auth_config.allow_anonymous_health = getattr(settings, 'allow_anonymous_health', auth_config.allow_anonymous_health)
-    
+    auth_config.jwt_secret_key = getattr(
+        settings, "jwt_secret_key", auth_config.jwt_secret_key
+    )
+    auth_config.jwt_algorithm = getattr(
+        settings, "jwt_algorithm", auth_config.jwt_algorithm
+    )
+    auth_config.jwt_expiration_hours = getattr(
+        settings, "jwt_expiration_hours", auth_config.jwt_expiration_hours
+    )
+    auth_config.require_auth = getattr(
+        settings, "require_auth", auth_config.require_auth
+    )
+    auth_config.allow_anonymous_health = getattr(
+        settings, "allow_anonymous_health", auth_config.allow_anonymous_health
+    )
+
     # Load API keys from environment
-    api_keys_str = getattr(settings, 'api_keys', '')
+    api_keys_str = getattr(settings, "api_keys", "")
     if api_keys_str:
         # Format: "key1:user1,key2:user2"
-        for pair in api_keys_str.split(','):
-            if ':' in pair:
-                key, user_id = pair.strip().split(':', 1)
+        for pair in api_keys_str.split(","):
+            if ":" in pair:
+                key, user_id = pair.strip().split(":", 1)
                 auth_config.api_keys[key] = user_id
 
 
@@ -71,10 +80,10 @@ def create_jwt_token(user_id: str, username: str, scopes: list[str] = None) -> s
     """Create a JWT token for a user."""
     if scopes is None:
         scopes = ["read", "write"]
-    
-    now = datetime.now(timezone.utc)
+
+    now = datetime.now(UTC)
     exp = now + timedelta(hours=auth_config.jwt_expiration_hours)
-    
+
     payload = {
         "user_id": user_id,
         "username": username,
@@ -82,15 +91,19 @@ def create_jwt_token(user_id: str, username: str, scopes: list[str] = None) -> s
         "exp": exp,
         "iat": now,
     }
-    
-    return jwt.encode(payload, auth_config.jwt_secret_key, algorithm=auth_config.jwt_algorithm)
+
+    return jwt.encode(
+        payload, auth_config.jwt_secret_key, algorithm=auth_config.jwt_algorithm
+    )
 
 
 def verify_jwt_token(token: str) -> TokenData:
     """Verify and decode a JWT token."""
     try:
-        payload = jwt.decode(token, auth_config.jwt_secret_key, algorithms=[auth_config.jwt_algorithm])
-        
+        payload = jwt.decode(
+            token, auth_config.jwt_secret_key, algorithms=[auth_config.jwt_algorithm]
+        )
+
         return TokenData(
             user_id=payload["user_id"],
             username=payload["username"],
@@ -125,25 +138,25 @@ def verify_api_key(api_key: str) -> str:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    settings = Depends(get_settings)
-) -> Optional[TokenData]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    settings=Depends(get_settings),
+) -> TokenData | None:
     """Get the current authenticated user."""
-    
+
     # Initialize auth config if not done
-    if not auth_config.api_keys and hasattr(settings, 'api_keys'):
+    if not auth_config.api_keys and hasattr(settings, "api_keys"):
         init_auth_config(settings)
-    
+
     # If authentication is disabled, return anonymous user
     if not auth_config.require_auth:
         return TokenData(
             user_id="anonymous",
             username="anonymous",
             scopes=["read", "write"],
-            exp=datetime.now(timezone.utc) + timedelta(hours=24),
-            iat=datetime.now(timezone.utc),
+            exp=datetime.now(UTC) + timedelta(hours=24),
+            iat=datetime.now(UTC),
         )
-    
+
     # Check for API key in header first
     api_key = request.headers.get(auth_config.api_key_header)
     if api_key:
@@ -153,8 +166,8 @@ async def get_current_user(
                 user_id=user_id,
                 username=user_id,
                 scopes=["read", "write"],
-                exp=datetime.now(timezone.utc) + timedelta(hours=24),
-                iat=datetime.now(timezone.utc),
+                exp=datetime.now(UTC) + timedelta(hours=24),
+                iat=datetime.now(UTC),
             )
         except HTTPException:
             pass
@@ -166,15 +179,15 @@ async def get_current_user(
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = credentials.credentials
-    
+
     # Try JWT token first
     try:
         return verify_jwt_token(token)
     except HTTPException:
         pass
-    
+
     # Try API key
     try:
         user_id = verify_api_key(token)
@@ -182,12 +195,12 @@ async def get_current_user(
             user_id=user_id,
             username=user_id,
             scopes=["read", "write"],
-            exp=datetime.now(timezone.utc) + timedelta(hours=24),
-            iat=datetime.now(timezone.utc),
+            exp=datetime.now(UTC) + timedelta(hours=24),
+            iat=datetime.now(UTC),
         )
     except HTTPException:
         pass
-    
+
     # Neither worked
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -198,9 +211,9 @@ async def get_current_user(
 
 async def get_current_user_optional(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    settings = Depends(get_settings)
-) -> Optional[TokenData]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    settings=Depends(get_settings),
+) -> TokenData | None:
     """Get the current user, but don't require authentication."""
     try:
         return await get_current_user(request, credentials, settings)
@@ -210,7 +223,7 @@ async def get_current_user_optional(
 
 def require_scope(required_scope: str):
     """Dependency to require a specific scope."""
-    
+
     async def check_scope(current_user: TokenData = Depends(get_current_user)):
         if required_scope not in current_user.scopes:
             raise HTTPException(
@@ -218,7 +231,7 @@ def require_scope(required_scope: str):
                 detail=f"Insufficient permissions. Required scope: {required_scope}",
             )
         return current_user
-    
+
     return check_scope
 
 

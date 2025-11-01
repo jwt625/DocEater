@@ -24,11 +24,15 @@ class TestFileEventHandler:
         return processor
 
     @pytest.fixture
-    def event_handler(self, mock_processor: AsyncMock, test_settings) -> FileEventHandler:
+    def event_handler(
+        self, mock_processor: AsyncMock, test_settings
+    ) -> FileEventHandler:
         """Create a FileEventHandler instance for testing."""
         return FileEventHandler(mock_processor, test_settings)
 
-    def test_handler_initialization(self, event_handler: FileEventHandler, mock_processor: AsyncMock, test_settings):
+    def test_handler_initialization(
+        self, event_handler: FileEventHandler, mock_processor: AsyncMock, test_settings
+    ):
         """Test FileEventHandler initialization."""
         assert event_handler.processor is mock_processor
         assert event_handler.settings is test_settings
@@ -37,7 +41,9 @@ class TestFileEventHandler:
         assert len(event_handler._debounce_tasks) == 0
 
     @pytest.mark.asyncio
-    async def test_on_created_file(self, event_handler: FileEventHandler, temp_dir: Path):
+    async def test_on_created_file(
+        self, event_handler: FileEventHandler, temp_dir: Path
+    ):
         """Test handling file creation events."""
         test_file = temp_dir / "test.pdf"
         test_file.touch()
@@ -49,7 +55,9 @@ class TestFileEventHandler:
         assert len(event_handler._debounce_tasks) == 1
         assert str(test_file) in event_handler._debounce_tasks
 
-    def test_on_created_directory_ignored(self, event_handler: FileEventHandler, temp_dir: Path):
+    def test_on_created_directory_ignored(
+        self, event_handler: FileEventHandler, temp_dir: Path
+    ):
         """Test that directory creation events are ignored."""
         test_dir = temp_dir / "subdir"
         test_dir.mkdir()
@@ -62,7 +70,9 @@ class TestFileEventHandler:
         assert len(event_handler._debounce_tasks) == 0
 
     @pytest.mark.asyncio
-    async def test_on_modified_file(self, event_handler: FileEventHandler, temp_dir: Path):
+    async def test_on_modified_file(
+        self, event_handler: FileEventHandler, temp_dir: Path
+    ):
         """Test handling file modification events."""
         test_file = temp_dir / "test.pdf"
         test_file.write_text("content")
@@ -89,7 +99,9 @@ class TestFileEventHandler:
         assert str(dest_file) in event_handler._debounce_tasks
 
     @pytest.mark.asyncio
-    async def test_debounce_cancellation(self, event_handler: FileEventHandler, temp_dir: Path):
+    async def test_debounce_cancellation(
+        self, event_handler: FileEventHandler, temp_dir: Path
+    ):
         """Test that rapid file events are debounced properly."""
         test_file = temp_dir / "test.pdf"
         test_file.touch()
@@ -117,22 +129,24 @@ class TestFileEventHandler:
         assert second_task is not first_task
 
     @pytest.mark.asyncio
-    async def test_queue_file_processing(self, event_handler: FileEventHandler, temp_dir: Path):
+    async def test_queue_file_processing(
+        self, event_handler: FileEventHandler, temp_dir: Path
+    ):
         """Test that files are queued for processing after debounce delay."""
         test_file = temp_dir / "test.pdf"
         test_file.touch()
-        
+
         event = FileCreatedEvent(str(test_file))
         event_handler.on_created(event)
-        
+
         # Wait for debounce delay plus a bit more
         await asyncio.sleep(event_handler.settings.processing_delay_seconds + 0.05)
-        
+
         # File should be in queue
         assert not event_handler.processing_queue.empty()
         queued_file = await event_handler.processing_queue.get()
         assert queued_file == test_file
-        
+
         # Debounce task should be cleaned up
         assert len(event_handler._debounce_tasks) == 0
 
@@ -152,7 +166,9 @@ class TestFileWatcher:
         """Create a FileWatcher instance for testing."""
         return FileWatcher(test_settings, mock_processor)
 
-    def test_watcher_initialization(self, file_watcher: FileWatcher, test_settings, mock_processor: AsyncMock):
+    def test_watcher_initialization(
+        self, file_watcher: FileWatcher, test_settings, mock_processor: AsyncMock
+    ):
         """Test FileWatcher initialization."""
         assert file_watcher.settings is test_settings
         assert file_watcher.processor is mock_processor
@@ -164,10 +180,10 @@ class TestFileWatcher:
     def test_watcher_initialization_with_defaults(self, temp_dir: Path):
         """Test FileWatcher initialization with default parameters."""
         from doceater.config import Settings
-        
+
         settings = Settings(watch_folder=str(temp_dir))
         watcher = FileWatcher(settings)
-        
+
         assert watcher.settings is settings
         assert isinstance(watcher.processor, DocumentProcessor)
 
@@ -176,9 +192,9 @@ class TestFileWatcher:
         """Test starting watcher with non-existent folder."""
         test_settings.watch_folder = "/nonexistent/folder"
         watcher = FileWatcher(test_settings)
-        
+
         await watcher.start_watching()
-        
+
         # Should not start watching
         assert watcher._running is False
         assert watcher.observer is None
@@ -187,15 +203,17 @@ class TestFileWatcher:
     async def test_start_watching_already_running(self, file_watcher: FileWatcher):
         """Test starting watcher when already running."""
         file_watcher._running = True
-        
-        with patch('doceater.watcher.logger') as mock_logger:
+
+        with patch("doceater.watcher.logger") as mock_logger:
             await file_watcher.start_watching()
-            mock_logger.warning.assert_called_once_with("File watcher is already running")
+            mock_logger.warning.assert_called_once_with(
+                "File watcher is already running"
+            )
 
     @pytest.mark.asyncio
     async def test_start_watching_success(self, file_watcher: FileWatcher):
         """Test successful watcher startup."""
-        with patch('doceater.watcher.Observer') as mock_observer_class:
+        with patch("doceater.watcher.Observer") as mock_observer_class:
             mock_observer = MagicMock()
             mock_observer_class.return_value = mock_observer
 
@@ -247,34 +265,40 @@ class TestFileWatcher:
         assert mock_task.cancelled()
 
     @pytest.mark.asyncio
-    async def test_manual_process_file_success(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_manual_process_file_success(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test manual file processing."""
         test_file = temp_dir / "test.pdf"
         test_file.write_bytes(b"test content")
-        
+
         result = await file_watcher.manual_process_file(test_file)
-        
+
         assert result is True
         file_watcher.processor.process_file.assert_called_once_with(test_file)
 
     @pytest.mark.asyncio
-    async def test_manual_process_file_nonexistent(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_manual_process_file_nonexistent(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test manual processing of non-existent file."""
         nonexistent_file = temp_dir / "nonexistent.pdf"
-        
+
         result = await file_watcher.manual_process_file(nonexistent_file)
-        
+
         assert result is False
         file_watcher.processor.process_file.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_manual_process_file_string_path(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_manual_process_file_string_path(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test manual file processing with string path."""
         test_file = temp_dir / "test.pdf"
         test_file.write_bytes(b"test content")
-        
+
         result = await file_watcher.manual_process_file(str(test_file))
-        
+
         assert result is True
         file_watcher.processor.process_file.assert_called_once_with(test_file)
 
@@ -282,12 +306,14 @@ class TestFileWatcher:
     async def test_process_existing_files_empty_folder(self, file_watcher: FileWatcher):
         """Test processing existing files in empty folder."""
         await file_watcher.process_existing_files()
-        
+
         # Should complete without processing any files
         file_watcher.processor.process_file.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_process_existing_files_with_files(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_process_existing_files_with_files(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test processing existing files."""
         # Create test files
         pdf_file = temp_dir / "test.pdf"
@@ -302,13 +328,18 @@ class TestFileWatcher:
 
         # Should process supported files only
         assert file_watcher.processor.process_file.call_count == 2
-        processed_files = {call.args[0].resolve() for call in file_watcher.processor.process_file.call_args_list}
+        processed_files = {
+            call.args[0].resolve()
+            for call in file_watcher.processor.process_file.call_args_list
+        }
         assert pdf_file.resolve() in processed_files
         assert txt_file.resolve() in processed_files
         assert ignored_file.resolve() not in processed_files
 
     @pytest.mark.asyncio
-    async def test_process_existing_files_recursive(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_process_existing_files_recursive(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test processing existing files recursively."""
         # Create nested structure
         subdir = temp_dir / "subdir"
@@ -324,7 +355,10 @@ class TestFileWatcher:
 
         # Should process both files (recursive is True in test_settings)
         assert file_watcher.processor.process_file.call_count == 2
-        processed_files = {call.args[0].resolve() for call in file_watcher.processor.process_file.call_args_list}
+        processed_files = {
+            call.args[0].resolve()
+            for call in file_watcher.processor.process_file.call_args_list
+        }
         assert root_file.resolve() in processed_files
         assert nested_file.resolve() in processed_files
 
@@ -341,7 +375,9 @@ class TestFileWatcher:
         mock_processor.process_file.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_process_queue_concurrency_limit(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_process_queue_concurrency_limit(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test that processing queue respects concurrency limits."""
         # Set low concurrency limit for testing
         file_watcher.settings.max_concurrent_files = 1
@@ -368,7 +404,9 @@ class TestFileWatcher:
 
         # Start watcher and queue files
         file_watcher._running = True
-        file_watcher.event_handler = FileEventHandler(slow_processor, file_watcher.settings)
+        file_watcher.event_handler = FileEventHandler(
+            slow_processor, file_watcher.settings
+        )
 
         # Queue all files
         for file_path in files:
@@ -390,13 +428,17 @@ class TestFileWatcher:
         await queue_task
 
     @pytest.mark.asyncio
-    async def test_process_file_safe_error_handling(self, file_watcher: FileWatcher, temp_dir: Path):
+    async def test_process_file_safe_error_handling(
+        self, file_watcher: FileWatcher, temp_dir: Path
+    ):
         """Test that _process_file_safe handles errors gracefully."""
         test_file = temp_dir / "test.pdf"
         test_file.write_bytes(b"content")
 
         # Mock processor to raise exception
-        file_watcher.processor.process_file = AsyncMock(side_effect=Exception("Processing error"))
+        file_watcher.processor.process_file = AsyncMock(
+            side_effect=Exception("Processing error")
+        )
 
         # Should not raise exception
         await file_watcher._process_file_safe(test_file)
@@ -409,13 +451,15 @@ class TestFileWatcherIntegration:
     """Integration tests for file watcher with real file operations."""
 
     @pytest.mark.asyncio
-    async def test_end_to_end_file_processing(self, test_settings, test_db_manager, temp_dir: Path):
+    async def test_end_to_end_file_processing(
+        self, test_settings, test_db_manager, temp_dir: Path
+    ):
         """Test end-to-end file processing workflow."""
         # Disable images for simpler testing
         test_settings.images_enabled = False
 
         # Create a real processor (but mock the docling wrapper)
-        with patch('doceater.processor.DoclingWrapper') as mock_wrapper_class:
+        with patch("doceater.processor.DoclingWrapper") as mock_wrapper_class:
             mock_wrapper = MagicMock()
             mock_wrapper.convert_to_markdown.return_value = "# Test Document\n\nContent"
             mock_wrapper_class.return_value = mock_wrapper
@@ -444,7 +488,7 @@ class TestFileWatcherIntegration:
 
         try:
             # Start watcher
-            with patch('doceater.watcher.Observer') as mock_observer_class:
+            with patch("doceater.watcher.Observer") as mock_observer_class:
                 mock_observer = MagicMock()
                 mock_observer_class.return_value = mock_observer
 
@@ -494,7 +538,7 @@ class TestFileWatcherIntegration:
 
         # Fire all events rapidly
         for event in events:
-            if hasattr(event, 'is_directory'):
+            if hasattr(event, "is_directory"):
                 event.is_directory = False
             if isinstance(event, FileCreatedEvent):
                 handler.on_created(event)

@@ -6,9 +6,8 @@ from .responses import *
 __all__ = [
     # Request models
     "DocumentUploadRequest",
-    "SearchRequest", 
+    "SearchRequest",
     "SimilarSearchRequest",
-    
     # Response models
     "DocumentResponse",
     "DocumentListResponse",

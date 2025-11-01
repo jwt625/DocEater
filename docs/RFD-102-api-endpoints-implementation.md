@@ -1,6 +1,6 @@
 # Implementation Doc: FastAPI Endpoints for DocEater PDF Processing
 
-**Author:** Wentao  
+**Author:** Wentao
 **Date:** 2025-10-11
 **Status:** ✅ Complete - All Infrastructure Issues Resolved
 **Last Updated:** 2025-11-01
@@ -223,7 +223,7 @@ Response:
 # Token creation
 payload = {
     "user_id": "user123",
-    "username": "john_doe", 
+    "username": "john_doe",
     "scopes": ["read", "write"],
     "exp": datetime.utcnow() + timedelta(hours=24),
     "iat": datetime.utcnow()
@@ -280,7 +280,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_workers: int = 1
     api_reload: bool = False
-    
+
     # Authentication
     require_auth: bool = True
     allow_anonymous_health: bool = True
@@ -288,14 +288,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
     api_keys: str = ""
-    
+
     # File uploads
     upload_max_size_mb: int = 100
     upload_chunk_size_kb: int = 64
     upload_timeout_seconds: int = 300
     temp_upload_dir: str = "~/doceater_data/temp"
     cleanup_temp_files: bool = True
-    
+
     # CORS
     cors_origins: str = "*"
     cors_methods: str = "GET,POST,PUT,DELETE"
@@ -838,7 +838,7 @@ class EmbeddingService:
 ```python
 class EmbeddingService:
     """Jina CLIP v2 embedding service for DocEater API."""
-    
+
     async def generate_text_embeddings(self, texts: List[str]) -> List[List[float]]
     async def generate_image_embeddings(self, images: List[PIL.Image]) -> List[List[float]]
     async def search_similar_text(self, query: str, top_k: int) -> List[SearchResult]

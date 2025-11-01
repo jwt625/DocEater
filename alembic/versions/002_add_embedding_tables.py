@@ -20,10 +20,10 @@ depends_on = None
 
 def upgrade() -> None:
     """Add embedding tables and pgvector extension."""
-    
+
     # Enable pgvector extension
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    
+
     # Create text_embeddings table
     op.create_table(
         "text_embeddings",
@@ -69,7 +69,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    
+
     # Create image_embeddings table
     op.create_table(
         "image_embeddings",
@@ -101,8 +101,12 @@ def upgrade() -> None:
     )
 
     # Convert embedding columns to proper vector type and create vector indexes
-    op.execute("ALTER TABLE text_embeddings ALTER COLUMN embedding TYPE vector(1024) USING embedding::vector(1024)")
-    op.execute("ALTER TABLE image_embeddings ALTER COLUMN embedding TYPE vector(1024) USING embedding::vector(1024)")
+    op.execute(
+        "ALTER TABLE text_embeddings ALTER COLUMN embedding TYPE vector(1024) USING embedding::vector(1024)"
+    )
+    op.execute(
+        "ALTER TABLE image_embeddings ALTER COLUMN embedding TYPE vector(1024) USING embedding::vector(1024)"
+    )
 
     # Create vector similarity indexes using IVFFlat
     op.execute("""
@@ -141,7 +145,7 @@ def upgrade() -> None:
         ["created_at"],
         unique=False,
     )
-    
+
     # Create indexes for image_embeddings
     op.create_index(
         op.f("ix_image_embeddings_id"),
@@ -172,18 +176,20 @@ def downgrade() -> None:
 
     # Drop indexes for image_embeddings
     op.drop_index(op.f("ix_image_embeddings_created_at"), table_name="image_embeddings")
-    op.drop_index(op.f("ix_image_embeddings_document_image_id"), table_name="image_embeddings")
+    op.drop_index(
+        op.f("ix_image_embeddings_document_image_id"), table_name="image_embeddings"
+    )
     op.drop_index(op.f("ix_image_embeddings_id"), table_name="image_embeddings")
-    
+
     # Drop indexes for text_embeddings
     op.drop_index(op.f("ix_text_embeddings_created_at"), table_name="text_embeddings")
     op.drop_index(op.f("ix_text_embeddings_page_number"), table_name="text_embeddings")
     op.drop_index(op.f("ix_text_embeddings_document_id"), table_name="text_embeddings")
     op.drop_index(op.f("ix_text_embeddings_id"), table_name="text_embeddings")
-    
+
     # Drop tables
     op.drop_table("image_embeddings")
     op.drop_table("text_embeddings")
-    
+
     # Note: We don't drop the vector extension as other applications might be using it
     # op.execute("DROP EXTENSION IF EXISTS vector")

@@ -220,17 +220,33 @@ class DatabaseManager:
             await session.execute(
                 select(DocumentImage).where(DocumentImage.document_id == document_id)
             )
-            images = (await session.execute(
-                select(DocumentImage).where(DocumentImage.document_id == document_id)
-            )).scalars().all()
+            images = (
+                (
+                    await session.execute(
+                        select(DocumentImage).where(
+                            DocumentImage.document_id == document_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             for image in images:
                 await session.delete(image)
 
             # Delete associated metadata
-            metadata_entries = (await session.execute(
-                select(DocumentMetadata).where(DocumentMetadata.document_id == document_id)
-            )).scalars().all()
+            metadata_entries = (
+                (
+                    await session.execute(
+                        select(DocumentMetadata).where(
+                            DocumentMetadata.document_id == document_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             for metadata in metadata_entries:
                 await session.delete(metadata)

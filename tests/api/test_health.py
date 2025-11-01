@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
@@ -20,7 +19,9 @@ class TestHealthEndpoint:
 
             # Mock session for health check
             mock_session = AsyncMock()
-            mock_db_manager.get_session = lambda: AsyncContextManagerMock(return_value=mock_session)
+            mock_db_manager.get_session = lambda: AsyncContextManagerMock(
+                return_value=mock_session
+            )
 
             response = test_client.get("/api/v1/health")
 
@@ -45,7 +46,9 @@ class TestHealthEndpoint:
             mock_get_db.return_value = mock_db_manager
 
             # Mock database connection failure
-            failed_context = AsyncContextManagerMock(side_effect=Exception("Database connection failed"))
+            failed_context = AsyncContextManagerMock(
+                side_effect=Exception("Database connection failed")
+            )
             # Use a lambda to return the context manager directly, not wrapped in AsyncMock
             mock_db_manager.get_session = lambda: failed_context
 
@@ -91,25 +94,27 @@ class TestStatsEndpoint:
         with patch("doceater.api.routes.health.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
-            
+
             # Mock session and query results
             mock_session = AsyncMock()
-            mock_db_manager.get_session = lambda: AsyncContextManagerMock(return_value=mock_session)
-            
+            mock_db_manager.get_session = lambda: AsyncContextManagerMock(
+                return_value=mock_session
+            )
+
             # Mock query results for statistics
             mock_result = MagicMock()
             mock_result.scalar.return_value = 10  # Mock count results
             mock_session.execute.return_value = mock_result
-            
+
             response = test_client.get("/api/v1/stats", headers=auth_headers)
-            
+
             assert response.status_code == status.HTTP_200_OK
             response_data = response.json()
-            
+
             # Verify all required fields are present
             required_fields = [
                 "total_documents",
-                "processing_documents", 
+                "processing_documents",
                 "failed_documents",
                 "total_text_embeddings",
                 "total_image_embeddings",
@@ -120,14 +125,14 @@ class TestStatsEndpoint:
                 "avg_processing_time_seconds",
                 "avg_search_time_ms",
             ]
-            
+
             for field in required_fields:
                 assert field in response_data
 
     def test_stats_unauthenticated(self, test_client: TestClient):
         """Test stats endpoint without authentication should fail."""
         response = test_client.get("/api/v1/stats")
-        
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_stats_database_error(
@@ -139,12 +144,14 @@ class TestStatsEndpoint:
         with patch("doceater.api.routes.health.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
-            
+
             # Mock database error
             mock_session = AsyncMock()
-            mock_db_manager.get_session = lambda: AsyncContextManagerMock(return_value=mock_session)
+            mock_db_manager.get_session = lambda: AsyncContextManagerMock(
+                return_value=mock_session
+            )
             mock_session.execute.side_effect = Exception("Query failed")
-            
+
             response = test_client.get("/api/v1/stats", headers=auth_headers)
-            
+
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

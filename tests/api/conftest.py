@@ -1,16 +1,15 @@
 """API test fixtures and configuration."""
 
-import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
-from doceater.api.auth import TokenData, create_jwt_token
+from doceater.api.auth import create_jwt_token
 from doceater.api.main import create_app
 from doceater.config import Settings
 from doceater.database import DatabaseManager
@@ -65,7 +64,7 @@ def test_client(test_app) -> TestClient:
 
 
 @pytest_asyncio.fixture
-async def async_test_client(test_app) -> AsyncGenerator[AsyncClient, None]:
+async def async_test_client(test_app) -> AsyncGenerator[AsyncClient]:
     """Create an async test client for the FastAPI application."""
     async with AsyncClient(app=test_app, base_url="http://test") as client:
         yield client
@@ -80,9 +79,7 @@ def valid_jwt_token(api_test_settings: Settings) -> str:
     init_auth_config(api_test_settings)
 
     return create_jwt_token(
-        user_id="test-user",
-        username="test-user",
-        scopes=["read", "write"]
+        user_id="test-user", username="test-user", scopes=["read", "write"]
     )
 
 
@@ -95,9 +92,7 @@ def read_only_jwt_token(api_test_settings: Settings) -> str:
     init_auth_config(api_test_settings)
 
     return create_jwt_token(
-        user_id="readonly-user",
-        username="readonly-user",
-        scopes=["read"]
+        user_id="readonly-user", username="readonly-user", scopes=["read"]
     )
 
 
@@ -143,7 +138,9 @@ def mock_db_manager():
         # Create a proper async context manager for get_session
         mock_session = AsyncMock()
         # get_session is an async context manager, so we need to mock it properly
-        mock_manager.get_session = lambda: AsyncContextManagerMock(return_value=mock_session)
+        mock_manager.get_session = lambda: AsyncContextManagerMock(
+            return_value=mock_session
+        )
 
         mock.return_value = mock_manager
         yield mock_manager
@@ -152,7 +149,7 @@ def mock_db_manager():
 @pytest.fixture
 def create_test_pdf():
     """Factory fixture to create test PDF files."""
-    
+
     def _create_pdf(size_mb: float = 0.1, filename: str = "test.pdf") -> bytes:
         """Create a test PDF file of specified size."""
         # Create a minimal PDF structure
@@ -160,22 +157,22 @@ def create_test_pdf():
         pdf_content = b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
         pdf_content += b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
         pdf_content += b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
-        
+
         # Add padding to reach desired size
         target_size = int(size_mb * 1024 * 1024)
         current_size = len(pdf_header) + len(pdf_content)
-        
+
         if target_size > current_size:
             padding_size = target_size - current_size - 20  # Leave room for trailer
             padding = b"%" + b"X" * padding_size + b"\n"
         else:
             padding = b""
-        
+
         pdf_trailer = b"xref\n0 4\n0000000000 65535 f \n"
         pdf_trailer += b"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n0\n%%EOF\n"
-        
+
         return pdf_header + pdf_content + padding + pdf_trailer
-    
+
     return _create_pdf
 
 

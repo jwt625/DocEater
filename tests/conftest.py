@@ -18,7 +18,6 @@ from sqlalchemy.orm import sessionmaker
 
 from doceater.config import Settings
 from doceater.database import DatabaseManager
-from doceater.models import Base
 
 
 @pytest.fixture(scope="session")
@@ -97,7 +96,9 @@ async def clean_database(test_engine: AsyncEngine) -> AsyncGenerator[None]:
 
 
 @pytest_asyncio.fixture
-async def test_session(test_engine: AsyncEngine, clean_database) -> AsyncGenerator[AsyncSession]:
+async def test_session(
+    test_engine: AsyncEngine, clean_database
+) -> AsyncGenerator[AsyncSession]:
     """Create a test database session."""
     async_session = sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False

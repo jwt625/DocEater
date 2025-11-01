@@ -1,16 +1,15 @@
 """Tests for document management API endpoints."""
 
 import io
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
 from doceater.models import Document, DocumentStatus
+
 from .conftest import AsyncContextManagerMock
 
 
@@ -36,7 +35,7 @@ class TestDocumentUpload:
         mock_document.created_at = "2025-10-11T10:00:00Z"
         mock_document.updated_at = "2025-10-11T10:00:00Z"
         mock_document.markdown_content = None
-        
+
         mock_db_manager.create_document.return_value = mock_document
 
         # Prepare file upload
@@ -54,7 +53,7 @@ class TestDocumentUpload:
         # Verify response
         assert response.status_code == status.HTTP_200_OK
         response_data = response.json()
-        
+
         assert response_data["filename"] == "test.pdf"
         assert response_data["file_size"] == len(small_test_pdf)
         assert response_data["mime_type"] == "application/pdf"
@@ -84,7 +83,9 @@ class TestDocumentUpload:
         mock_db_manager.create_document.return_value = mock_document
 
         # Prepare file upload
-        files = {"file": ("test_cleanup.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
+        files = {
+            "file": ("test_cleanup.pdf", io.BytesIO(small_test_pdf), "application/pdf")
+        }
         data = {"description": "Test cleanup"}
 
         # Verify temp file doesn't exist before upload
@@ -103,7 +104,9 @@ class TestDocumentUpload:
         assert response.status_code == status.HTTP_200_OK
 
         # Verify temp file was cleaned up (since cleanup_temp_files=True in test config)
-        assert not temp_file_path.exists(), "Temporary file should be cleaned up after successful upload"
+        assert not temp_file_path.exists(), (
+            "Temporary file should be cleaned up after successful upload"
+        )
 
     def test_upload_pdf_unauthenticated(
         self,
@@ -112,9 +115,9 @@ class TestDocumentUpload:
     ):
         """Test PDF upload without authentication should fail."""
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post("/api/v1/documents/upload", files=files)
-        
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "authentication required" in response.json()["detail"].lower()
 
@@ -126,13 +129,13 @@ class TestDocumentUpload:
     ):
         """Test PDF upload with read-only permissions should fail."""
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=read_only_headers,
         )
-        
+
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "insufficient permissions" in response.json()["detail"].lower()
 
@@ -144,13 +147,13 @@ class TestDocumentUpload:
         """Test upload of non-PDF file should fail."""
         text_content = b"This is not a PDF file"
         files = {"file": ("document.txt", io.BytesIO(text_content), "text/plain")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "only pdf files are supported" in response.json()["detail"].lower()
 
@@ -162,13 +165,13 @@ class TestDocumentUpload:
     ):
         """Test upload of file exceeding size limit should fail."""
         files = {"file": ("large.pdf", io.BytesIO(large_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
         assert "exceeds maximum allowed size" in response.json()["detail"]
 
@@ -190,17 +193,17 @@ class TestDocumentUpload:
         mock_document.created_at = "2025-10-11T10:00:00Z"
         mock_document.updated_at = "2025-10-11T10:00:00Z"
         mock_document.markdown_content = None
-        
+
         mock_db_manager.create_document.return_value = mock_document
 
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=api_key_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
 
     def test_upload_streaming_functionality(
@@ -213,7 +216,7 @@ class TestDocumentUpload:
         """Test that large files are streamed properly without loading into memory."""
         # Create a moderately large PDF (10MB)
         large_pdf_content = b"%PDF-1.4\n" + b"X" * (10 * 1024 * 1024 - 10) + b"\n%%EOF"
-        
+
         # Mock database operations
         mock_document = MagicMock(spec=Document)
         mock_document.id = uuid4()
@@ -224,17 +227,19 @@ class TestDocumentUpload:
         mock_document.created_at = "2025-10-11T10:00:00Z"
         mock_document.updated_at = "2025-10-11T10:00:00Z"
         mock_document.markdown_content = None
-        
+
         mock_db_manager.create_document.return_value = mock_document
 
-        files = {"file": ("large.pdf", io.BytesIO(large_pdf_content), "application/pdf")}
-        
+        files = {
+            "file": ("large.pdf", io.BytesIO(large_pdf_content), "application/pdf")
+        }
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["file_size"] == len(large_pdf_content)
 
@@ -249,15 +254,15 @@ class TestDocumentUpload:
         """Test that temporary files are cleaned up when save operation fails."""
         # Mock file save to raise an exception
         mock_save_file.side_effect = Exception("Disk full")
-        
+
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "failed to save uploaded file" in response.json()["detail"].lower()
 
@@ -270,16 +275,18 @@ class TestDocumentUpload:
     ):
         """Test handling of database errors during upload."""
         # Mock database to raise an exception
-        mock_db_manager.create_document.side_effect = Exception("Database connection failed")
-        
+        mock_db_manager.create_document.side_effect = Exception(
+            "Database connection failed"
+        )
+
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "failed to process document" in response.json()["detail"].lower()
 
@@ -301,19 +308,19 @@ class TestDocumentUpload:
         mock_document.created_at = "2025-10-11T10:00:00Z"
         mock_document.updated_at = "2025-10-11T10:00:00Z"
         mock_document.markdown_content = None
-        
+
         mock_db_manager.create_document.return_value = mock_document
 
         files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
         data = {"description": "Test document with description"}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             data=data,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         response_data = response.json()
         assert response_data["filename"] == "test.pdf"
@@ -328,7 +335,7 @@ class TestDocumentUpload:
             "/api/v1/documents/upload",
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_upload_empty_filename(
@@ -339,13 +346,13 @@ class TestDocumentUpload:
     ):
         """Test upload with empty filename should fail."""
         files = {"file": ("", io.BytesIO(small_test_pdf), "application/pdf")}
-        
+
         response = test_client.post(
             "/api/v1/documents/upload",
             files=files,
             headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "validation" in response.json()["message"].lower()
 
@@ -362,21 +369,23 @@ class TestDocumentList:
         with patch("doceater.api.routes.documents.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
-            
+
             # Mock session and query results
             mock_session = AsyncMock()
-            mock_db_manager.get_session = lambda: AsyncContextManagerMock(return_value=mock_session)
-            
+            mock_db_manager.get_session = lambda: AsyncContextManagerMock(
+                return_value=mock_session
+            )
+
             # Mock query execution
             mock_result = MagicMock()
             mock_result.scalar.return_value = 0  # Total count
             mock_session.execute.return_value = mock_result
-            
+
             # Mock scalars for documents
             mock_result.scalars.return_value.all.return_value = []
-            
+
             response = test_client.get("/api/v1/documents", headers=auth_headers)
-            
+
             assert response.status_code == status.HTTP_200_OK
             response_data = response.json()
             assert "documents" in response_data
@@ -388,7 +397,7 @@ class TestDocumentList:
     def test_list_documents_unauthenticated(self, test_client: TestClient):
         """Test document listing without authentication should fail."""
         response = test_client.get("/api/v1/documents")
-        
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -402,11 +411,11 @@ class TestDocumentGet:
     ):
         """Test successful document retrieval."""
         document_id = uuid4()
-        
+
         with patch("doceater.api.routes.documents.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
-            
+
             # Mock document
             mock_document = MagicMock(spec=Document)
             mock_document.id = document_id
@@ -417,11 +426,13 @@ class TestDocumentGet:
             mock_document.created_at = "2025-10-11T10:00:00Z"
             mock_document.updated_at = "2025-10-11T10:00:00Z"
             mock_document.markdown_content = "# Test Document"
-            
+
             mock_db_manager.get_document_by_id.return_value = mock_document
-            
-            response = test_client.get(f"/api/v1/documents/{document_id}", headers=auth_headers)
-            
+
+            response = test_client.get(
+                f"/api/v1/documents/{document_id}", headers=auth_headers
+            )
+
             assert response.status_code == status.HTTP_200_OK
             response_data = response.json()
             assert response_data["id"] == str(document_id)
@@ -434,14 +445,16 @@ class TestDocumentGet:
     ):
         """Test getting non-existent document should return 404."""
         document_id = uuid4()
-        
+
         with patch("doceater.api.routes.documents.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
             mock_db_manager.get_document_by_id.return_value = None
-            
-            response = test_client.get(f"/api/v1/documents/{document_id}", headers=auth_headers)
-            
+
+            response = test_client.get(
+                f"/api/v1/documents/{document_id}", headers=auth_headers
+            )
+
             assert response.status_code == status.HTTP_404_NOT_FOUND
             assert "document not found" in response.json()["detail"].lower()
 
@@ -456,18 +469,20 @@ class TestDocumentDelete:
     ):
         """Test successful document deletion."""
         document_id = uuid4()
-        
+
         with patch("doceater.api.routes.documents.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
-            
+
             # Mock document exists
             mock_document = MagicMock(spec=Document)
             mock_document.id = document_id
             mock_db_manager.get_document_by_id.return_value = mock_document
-            
-            response = test_client.delete(f"/api/v1/documents/{document_id}", headers=auth_headers)
-            
+
+            response = test_client.delete(
+                f"/api/v1/documents/{document_id}", headers=auth_headers
+            )
+
             assert response.status_code == status.HTTP_200_OK
             assert "deleted successfully" in response.json()["message"].lower()
 
@@ -478,7 +493,9 @@ class TestDocumentDelete:
     ):
         """Test document deletion with read-only permissions should fail."""
         document_id = uuid4()
-        
-        response = test_client.delete(f"/api/v1/documents/{document_id}", headers=read_only_headers)
-        
+
+        response = test_client.delete(
+            f"/api/v1/documents/{document_id}", headers=read_only_headers
+        )
+
         assert response.status_code == status.HTTP_403_FORBIDDEN

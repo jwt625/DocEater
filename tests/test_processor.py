@@ -46,7 +46,7 @@ class TestDocumentProcessor:
         assert wrapper1 == mock_wrapper
         mock_wrapper_class.assert_called_once_with(
             enable_formula_enrichment=True,
-            enable_image_extraction=test_settings.images_enabled
+            enable_image_extraction=test_settings.images_enabled,
         )
 
         # Second access should return cached wrapper
@@ -266,7 +266,7 @@ class TestDocumentProcessor:
         # Mock the method that's actually called when images are enabled
         mock_wrapper.convert_to_markdown_with_storage.return_value = (
             "# Test Document\n\nContent",
-            []  # Empty list of temp image paths
+            [],  # Empty list of temp image paths
         )
         mock_wrapper_class.return_value = mock_wrapper
 

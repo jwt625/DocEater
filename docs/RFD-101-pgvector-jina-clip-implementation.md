@@ -1,8 +1,8 @@
 # Implementation Doc: PGVector + Jina CLIP v2 for Multimodal RAG
 
-**Author:** Wentao  
-**Date:** 2025-10-11  
-**Status:** Implemented  
+**Author:** Wentao
+**Date:** 2025-10-11
+**Status:** Implemented
 **Supersedes:** RFD-100 (FAISS + E5-V recommendations)
 
 ---
@@ -84,7 +84,7 @@ CREATE TABLE text_embeddings (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- Image embeddings table  
+-- Image embeddings table
 CREATE TABLE image_embeddings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_image_id UUID NOT NULL REFERENCES document_images(id) ON DELETE CASCADE,
@@ -95,10 +95,10 @@ CREATE TABLE image_embeddings (
 );
 
 -- Vector similarity indexes
-CREATE INDEX ix_text_embeddings_embedding_cosine 
+CREATE INDEX ix_text_embeddings_embedding_cosine
 ON text_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
-CREATE INDEX ix_image_embeddings_embedding_cosine 
+CREATE INDEX ix_image_embeddings_embedding_cosine
 ON image_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 ```
 
@@ -109,7 +109,7 @@ Added production models with proper relationships:
 ```python
 class TextEmbedding(Base):
     __tablename__ = "text_embeddings"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -119,20 +119,20 @@ class TextEmbedding(Base):
     chunk_index: Mapped[int] = mapped_column(nullable=False)
     token_count: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
-    
+
     # Relationships
     document: Mapped[Document] = relationship("Document", back_populates="text_embeddings")
 
 class ImageEmbedding(Base):
     __tablename__ = "image_embeddings"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     document_image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_images.id", ondelete="CASCADE"))
     embedding: Mapped[list[float]] = mapped_column(ARRAY(item_type=Text), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
-    
+
     # Relationships
     document_image: Mapped[DocumentImage] = relationship("DocumentImage", back_populates="image_embeddings")
 ```
@@ -176,8 +176,8 @@ Created comprehensive test (`test_embedding_minimal.py`) validating:
 ```sql
 -- Cosine similarity search (working)
 SELECT content, 1 - (embedding <=> $1) as similarity_score
-FROM test_embeddings 
-ORDER BY embedding <=> $1 
+FROM test_embeddings
+ORDER BY embedding <=> $1
 LIMIT 5;
 ```
 
@@ -197,7 +197,7 @@ dependencies = [
     # ... existing dependencies ...
     "sentence-transformers>=2.2.2",
     "pgvector>=0.2.4",
-    "numpy>=1.24.0", 
+    "numpy>=1.24.0",
     "einops>=0.8.0",    # Required by Jina CLIP v2
     "timm>=1.0.0",      # Required by Jina CLIP v2
 ]

@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any
 
 from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -88,7 +88,7 @@ class Document(Base):
     images: Mapped[list[DocumentImage]] = relationship(
         "DocumentImage", back_populates="document", cascade="all, delete-orphan"
     )
-    text_embeddings: Mapped[list["TextEmbedding"]] = relationship(
+    text_embeddings: Mapped[list[TextEmbedding]] = relationship(
         "TextEmbedding", back_populates="document", cascade="all, delete-orphan"
     )
 
@@ -163,7 +163,7 @@ class DocumentImage(Base):
 
     # Relationships
     document: Mapped[Document] = relationship("Document", back_populates="images")
-    image_embeddings: Mapped[list["ImageEmbedding"]] = relationship(
+    image_embeddings: Mapped[list[ImageEmbedding]] = relationship(
         "ImageEmbedding", back_populates="document_image", cascade="all, delete-orphan"
     )
 
@@ -251,8 +251,9 @@ class TextEmbedding(Base):
         Text, nullable=False, comment="Text content of the chunk"
     )
     embedding: Mapped[list[float]] = mapped_column(
-        ARRAY(item_type=Text), nullable=False,
-        comment="1024-dimensional embedding vector from Jina CLIP v2"
+        ARRAY(item_type=Text),
+        nullable=False,
+        comment="1024-dimensional embedding vector from Jina CLIP v2",
     )
 
     # Position information
@@ -275,7 +276,9 @@ class TextEmbedding(Base):
     )
 
     # Relationships
-    document: Mapped[Document] = relationship("Document", back_populates="text_embeddings")
+    document: Mapped[Document] = relationship(
+        "Document", back_populates="text_embeddings"
+    )
 
     def __repr__(self) -> str:
         return f"<TextEmbedding(id={self.id}, document_id={self.document_id}, chunk_index={self.chunk_index})>"
@@ -301,8 +304,9 @@ class ImageEmbedding(Base):
 
     # Embedding and metadata
     embedding: Mapped[list[float]] = mapped_column(
-        ARRAY(item_type=Text), nullable=False,
-        comment="1024-dimensional embedding vector from Jina CLIP v2"
+        ARRAY(item_type=Text),
+        nullable=False,
+        comment="1024-dimensional embedding vector from Jina CLIP v2",
     )
     description: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="Optional description or caption for the image"
@@ -317,7 +321,9 @@ class ImageEmbedding(Base):
     )
 
     # Relationships
-    document_image: Mapped[DocumentImage] = relationship("DocumentImage", back_populates="image_embeddings")
+    document_image: Mapped[DocumentImage] = relationship(
+        "DocumentImage", back_populates="image_embeddings"
+    )
 
     def __repr__(self) -> str:
         return f"<ImageEmbedding(id={self.id}, document_image_id={self.document_image_id})>"
