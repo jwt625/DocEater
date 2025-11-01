@@ -130,17 +130,11 @@ class DocumentProcessor:
         Returns:
             Tuple of (markdown_content, list_of_temp_image_paths)
         """
-        try:
-            if self.settings.images_enabled:
-                # Use the enhanced method that extracts to temporary directory
-                return self.docling_wrapper.convert_to_markdown_with_storage(file_path)
-            else:
-                # Fall back to text-only conversion
-                markdown_content = await self.convert_to_markdown(file_path)
-                return markdown_content, []
-        except Exception as e:
-            logger.error(f"Failed to convert document with images {file_path}: {e}")
-            raise
+        if not self.settings.images_enabled:
+            markdown_content = await self.convert_to_markdown(file_path)
+            return markdown_content, []
+
+        return self.docling_wrapper.convert_to_markdown_with_storage(file_path)
 
     async def process_file(self, file_path: Path) -> bool:
         """Process a single file completely."""
@@ -280,7 +274,7 @@ class DocumentProcessor:
                     "images_enabled": self.settings.images_enabled,
                 }
 
-                if self.settings.images_enabled and "stored_images" in locals():
+                if "stored_images" in locals():
                     log_details["images_extracted"] = len(stored_images)
                     log_details["image_types"] = [
                         img.image_type.value for img in stored_images

@@ -94,52 +94,7 @@ class DoclingWrapper:
         result = self.convert_document(file_path)
         return result.document.export_to_markdown()
 
-    def convert_to_markdown_with_images(
-        self,
-        file_path: Path | str,
-        output_dir: Path | str | None = None,
-        image_mode: str = "referenced",
-    ) -> tuple[str, list[Path]]:
-        """Convert document to Markdown with image extraction.
 
-        Args:
-            file_path: Path to the document to convert
-            output_dir: Directory to save extracted images (default: same as document)
-            image_mode: "embedded" for base64 images, "referenced" for file references
-
-        Returns:
-            Tuple of (markdown_content, list_of_image_paths)
-        """
-        if not self.enable_image_extraction:
-            logger.warning(
-                "Image extraction is disabled. Use enable_image_extraction=True"
-            )
-            return self.convert_to_markdown(file_path), []
-
-        result = self.convert_document(file_path)
-
-        # Set up output directory for images
-        if output_dir is None:
-            output_dir = Path(file_path).parent
-        else:
-            output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Extract and save images
-        extracted_images = self.extract_images(result, output_dir)
-
-        # Convert to markdown with image references
-        if image_mode == "embedded":
-            markdown_content = result.document.export_to_markdown(
-                image_mode=ImageRefMode.EMBEDDED
-            )
-        else:
-            markdown_content = result.document.export_to_markdown(
-                image_mode=ImageRefMode.REFERENCED
-            )
-
-        logger.info(f"Extracted {len(extracted_images)} images to {output_dir}")
-        return markdown_content, extracted_images
 
     def convert_to_markdown_with_storage(
         self,

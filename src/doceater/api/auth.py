@@ -182,31 +182,15 @@ async def get_current_user(
 
     token = credentials.credentials
 
-    # Try JWT token first
+    # Try JWT token
     try:
         return verify_jwt_token(token)
     except HTTPException:
-        pass
-
-    # Try API key
-    try:
-        user_id = verify_api_key(token)
-        return TokenData(
-            user_id=user_id,
-            username=user_id,
-            scopes=["read", "write"],
-            exp=datetime.now(UTC) + timedelta(hours=24),
-            iat=datetime.now(UTC),
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    except HTTPException:
-        pass
-
-    # Neither worked
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid authentication credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
 
 
 async def get_current_user_optional(

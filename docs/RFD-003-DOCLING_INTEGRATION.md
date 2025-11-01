@@ -70,7 +70,7 @@ The integration consists of two main components:
    - Enhanced configuration with local models
    - Image extraction with configurable resolution
    - Formula enrichment support
-   - Methods: `convert_to_markdown()`, `convert_to_markdown_with_images()`, `extract_images()`
+   - Methods: `convert_to_markdown()`, `convert_to_markdown_with_storage()`, `extract_images()`
 
 2. **DocumentProcessor** (`src/doceater/processor.py`): ✅ **INTEGRATED**
    - Uses DoclingWrapper for enhanced processing
@@ -95,9 +95,9 @@ wrapper = DoclingWrapper(
     enable_image_extraction=True,
     images_scale=2.0  # High resolution (144 DPI)
 )
-markdown, images = wrapper.convert_to_markdown_with_images(
+markdown, images = wrapper.convert_to_markdown_with_storage(
     "document.pdf",
-    output_dir="extracted_images"
+    temp_dir="extracted_images"
 )
 ```
 
@@ -160,9 +160,9 @@ result = wrapper.convert_document("path/to/document.pdf")
 markdown = wrapper.convert_to_markdown("path/to/document.pdf")
 
 # Convert with image extraction
-markdown, images = wrapper.convert_to_markdown_with_images(
+markdown, images = wrapper.convert_to_markdown_with_storage(
     "path/to/document.pdf",
-    output_dir="images/",
+    temp_dir="images/",
     image_mode="referenced"  # or "embedded"
 )
 ```
@@ -397,7 +397,7 @@ markdown = wrapper.convert_to_markdown("test.pdf")
 
 # Test image extraction
 wrapper = DoclingWrapper(enable_image_extraction=True, images_scale=2.0)
-markdown, images = wrapper.convert_to_markdown_with_images("test.pdf", "output/")
+markdown, images = wrapper.convert_to_markdown_with_storage("test.pdf", "output/")
 ```
 
 **Output Files Generated:**

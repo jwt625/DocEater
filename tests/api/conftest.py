@@ -31,10 +31,7 @@ def api_test_settings(temp_dir: Path) -> Settings:
         api_keys="test-api-key:test-user",
         # File upload settings
         upload_max_size_mb=100,
-        upload_chunk_size_kb=64,
-        upload_timeout_seconds=300,
         temp_upload_dir=str(temp_dir / "uploads"),
-        cleanup_temp_files=True,
         # CORS settings
         cors_origins="*",
         cors_methods="GET,POST,PUT,DELETE",

@@ -150,8 +150,8 @@ async def upload_document(
             metadata={},
         )
 
-        # Clean up temp file after successful processing if configured
-        if settings.cleanup_temp_files and temp_file.exists():
+        # Clean up temp file after successful processing
+        if temp_file.exists():
             try:
                 temp_file.unlink()
                 logger.debug(f"Cleaned up temporary file: {temp_file}")

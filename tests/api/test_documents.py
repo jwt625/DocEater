@@ -68,7 +68,7 @@ class TestDocumentUpload:
         mock_db_manager: AsyncMock,
         temp_upload_dir: Path,
     ):
-        """Test that temporary files are cleaned up after successful upload when cleanup_temp_files=True."""
+        """Test that temporary files are cleaned up after successful upload."""
         # Mock database operations
         mock_document = MagicMock(spec=Document)
         mock_document.id = uuid4()
@@ -103,7 +103,7 @@ class TestDocumentUpload:
         # Verify response is successful
         assert response.status_code == status.HTTP_200_OK
 
-        # Verify temp file was cleaned up (since cleanup_temp_files=True in test config)
+        # Verify temp file was cleaned up (cleanup is always enabled)
         assert not temp_file_path.exists(), (
             "Temporary file should be cleaned up after successful upload"
         )

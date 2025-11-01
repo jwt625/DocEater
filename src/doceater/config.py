@@ -70,21 +70,11 @@ class Settings(BaseSettings):
     images_max_size_mb: int = Field(
         default=50, description="Maximum size per image in MB"
     )
-    images_allowed_formats: list[str] = Field(
-        default_factory=lambda: ["PNG", "JPEG", "WEBP"],
-        description="Allowed image formats for storage",
-    )
-    images_compression_quality: int = Field(
-        default=85, description="JPEG compression quality (1-100)"
-    )
     images_organize_by_date: bool = Field(
         default=True, description="Organize images in date-based directory structure"
     )
     images_cleanup_failed: bool = Field(
         default=True, description="Automatically cleanup images from failed extractions"
-    )
-    images_retention_days: int = Field(
-        default=365, description="Number of days to retain images (0 = forever)"
     )
 
     # Processing settings
@@ -140,16 +130,9 @@ class Settings(BaseSettings):
     upload_max_size_mb: int = Field(
         default=100, description="Maximum upload size in MB"
     )
-    upload_chunk_size_kb: int = Field(default=64, description="Upload chunk size in KB")
-    upload_timeout_seconds: int = Field(
-        default=300, description="Upload timeout in seconds"
-    )
     temp_upload_dir: str = Field(
         default_factory=lambda: str(Path.home() / "doceater_data" / "temp"),
         description="Temporary upload directory",
-    )
-    cleanup_temp_files: bool = Field(
-        default=True, description="Auto-cleanup temp files"
     )
 
     # CORS settings
@@ -224,23 +207,9 @@ class Settings(BaseSettings):
             raise ValueError("images_max_size_mb cannot exceed 500MB")
         return v
 
-    @field_validator("images_compression_quality")
-    @classmethod
-    def validate_compression_quality(cls, v: int) -> int:
-        """Ensure compression quality is valid."""
-        if not 1 <= v <= 100:
-            raise ValueError("images_compression_quality must be between 1 and 100")
-        return v
 
-    @field_validator("images_retention_days")
-    @classmethod
-    def validate_retention_days(cls, v: int) -> int:
-        """Ensure retention days is reasonable."""
-        if v < 0:
-            raise ValueError("images_retention_days cannot be negative")
-        if v > 3650:  # 10 years max
-            raise ValueError("images_retention_days cannot exceed 3650 days")
-        return v
+
+
 
     @property
     def images_max_size_bytes(self) -> int:
