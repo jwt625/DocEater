@@ -213,6 +213,35 @@ class DatabaseManager:
             result = await session.execute(query)
             return result.scalars().all()
 
+    async def delete_document(self, document_id: uuid.UUID) -> None:
+        """Delete a document and all associated data."""
+        async with self.get_session() as session:
+            # First delete associated images
+            await session.execute(
+                select(DocumentImage).where(DocumentImage.document_id == document_id)
+            )
+            images = (await session.execute(
+                select(DocumentImage).where(DocumentImage.document_id == document_id)
+            )).scalars().all()
+
+            for image in images:
+                await session.delete(image)
+
+            # Delete associated metadata
+            metadata_entries = (await session.execute(
+                select(DocumentMetadata).where(DocumentMetadata.document_id == document_id)
+            )).scalars().all()
+
+            for metadata in metadata_entries:
+                await session.delete(metadata)
+
+            # Delete the document itself
+            document = await session.get(Document, document_id)
+            if document:
+                await session.delete(document)
+
+        logger.info(f"Deleted document: {document_id}")
+
     # Metadata operations
     async def add_document_metadata(
         self,

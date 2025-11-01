@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -124,6 +124,7 @@ def verify_api_key(api_key: str) -> str:
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     settings = Depends(get_settings)
 ) -> Optional[TokenData]:
@@ -143,6 +144,21 @@ async def get_current_user(
             iat=datetime.now(timezone.utc),
         )
     
+    # Check for API key in header first
+    api_key = request.headers.get(auth_config.api_key_header)
+    if api_key:
+        try:
+            user_id = verify_api_key(api_key)
+            return TokenData(
+                user_id=user_id,
+                username=user_id,
+                scopes=["read", "write"],
+                exp=datetime.now(timezone.utc) + timedelta(hours=24),
+                iat=datetime.now(timezone.utc),
+            )
+        except HTTPException:
+            pass
+
     # No credentials provided
     if not credentials:
         raise HTTPException(
@@ -181,12 +197,13 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     settings = Depends(get_settings)
 ) -> Optional[TokenData]:
     """Get the current user, but don't require authentication."""
     try:
-        return await get_current_user(credentials, settings)
+        return await get_current_user(request, credentials, settings)
     except HTTPException:
         return None
 

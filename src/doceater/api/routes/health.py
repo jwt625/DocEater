@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
+from sqlalchemy import text
 
 from ...config import get_settings
 from ...database import get_db_manager
@@ -38,7 +39,7 @@ async def health_check(
     try:
         db_manager = get_db_manager()
         async with db_manager.get_session() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         db_status = "unhealthy"
@@ -98,31 +99,31 @@ async def system_stats(
             from ...models import DocumentStatus
             
             # Total documents
-            result = await session.execute("SELECT COUNT(*) FROM documents")
+            result = await session.execute(text("SELECT COUNT(*) FROM documents"))
             total_documents = result.scalar() or 0
-            
+
             # Processing documents
             result = await session.execute(
-                "SELECT COUNT(*) FROM documents WHERE status = $1",
-                (DocumentStatus.PROCESSING,)
+                text("SELECT COUNT(*) FROM documents WHERE status = :status"),
+                {"status": DocumentStatus.PROCESSING}
             )
             processing_documents = result.scalar() or 0
-            
+
             # Failed documents
             result = await session.execute(
-                "SELECT COUNT(*) FROM documents WHERE status = $1",
-                (DocumentStatus.FAILED,)
+                text("SELECT COUNT(*) FROM documents WHERE status = :status"),
+                {"status": DocumentStatus.FAILED}
             )
             failed_documents = result.scalar() or 0
-            
+
             # Embedding statistics
-            result = await session.execute("SELECT COUNT(*) FROM text_embeddings")
+            result = await session.execute(text("SELECT COUNT(*) FROM text_embeddings"))
             total_text_embeddings = result.scalar() or 0
-            
-            result = await session.execute("SELECT COUNT(*) FROM image_embeddings")
+
+            result = await session.execute(text("SELECT COUNT(*) FROM image_embeddings"))
             total_image_embeddings = result.scalar() or 0
-            
-            result = await session.execute("SELECT COUNT(*) FROM document_images")
+
+            result = await session.execute(text("SELECT COUNT(*) FROM document_images"))
             total_images = result.scalar() or 0
             
             # Storage statistics (simplified)
