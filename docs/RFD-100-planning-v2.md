@@ -2,7 +2,15 @@
 
 **Author:** Wentao
 **Date:** 2025-10-09
-**Status:** Draft → Adopt
+**Status:** Superseded by RFD-101
+**Superseded by:** RFD-101 (PGVector + Jina CLIP v2 implementation)
+
+> **⚠️ SUPERSEDED**: This RFD recommended FAISS + E5-V for vector storage and embeddings. The actual implementation used PGVector + Jina CLIP v2 instead (see RFD-101) due to:
+> - E5-V model not existing on HuggingFace (`intfloat/e5-v` was not found)
+> - PGVector providing better integration with existing PostgreSQL infrastructure
+> - Jina CLIP v2 offering proven multimodal capabilities with unified text+image embedding space
+>
+> The core concepts and architecture from this RFD were successfully implemented with the alternative technology stack.
 
 ---
 

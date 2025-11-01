@@ -1,5 +1,12 @@
 # DocEater Implementation Plan
 
+> **⚠️ SUPERSEDED**: This original implementation plan has been superseded by:
+> - **RFD-005**: Development Roadmap and Phase Planning (current roadmap)
+> - **RFD-101**: PGVector + Jina CLIP v2 implementation (embeddings)
+> - **RFD-102**: FastAPI Endpoints implementation (web service)
+>
+> The core concepts from this plan were successfully implemented, but the specific technical details and phases have been updated in the newer RFDs.
+
 ## Project Overview
 DocEater is a background service that watches folders for new files, converts them to Markdown using Docling, and stores content with metadata in PostgreSQL with pgvector for semantic search.
 

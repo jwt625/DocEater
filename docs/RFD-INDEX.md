@@ -6,18 +6,30 @@ This document provides an index of all Request for Discussion (RFD) documents fo
 
 | RFD | Title | Author | Date | Status |
 |-----|-------|--------|------|--------|
-| [000](RFD-000-implementation-plan.md) | Implementation Plan | Original Author | 2024 | Implemented |
+| [000](RFD-000-implementation-plan.md) | Implementation Plan | Original Author | 2024 | Superseded |
 | [001](RFD-001-mvp-plan.md) | MVP Plan | Original Author | 2024 | Implemented |
 | [002](RFD-002-testing-infrastructure.md) | Testing Infrastructure Implementation | Augment Agent | 2025-07-15 | Implemented |
 | [003](RFD-003-DOCLING_INTEGRATION.md) | Docling Integration | Original Author | 2024 | Implemented |
 | [004](RFD-004-IMAGE_STORAGE.md) | Image Storage System | Original Author | 2024 | Implemented |
-| [005](RFD-005-development-roadmap.md) | Development Roadmap and Phase Planning | Augment Agent | 2025-07-20 | Draft |
+| [005](RFD-005-development-roadmap.md) | Development Roadmap and Phase Planning | Augment Agent | 2025-07-20 | Phase 1 Complete |
+| [100](RFD-100-planning-v2.md) | Open-Source PDF + Image Embeddings for RAG | Wentao | 2025-10-09 | Superseded |
+| [101](RFD-101-pgvector-jina-clip-implementation.md) | PGVector + Jina CLIP v2 for Multimodal RAG | Wentao | 2025-10-11 | Implemented |
+| [102](RFD-102-api-endpoints-implementation.md) | FastAPI Endpoints for DocEater PDF Processing | Wentao | 2025-10-11 | Implemented |
+| [103](RFD-103-next-steps-roadmap.md) | Next Steps and Production Roadmap | Augment Agent | 2025-11-01 | Active |
+
+## Development Logs
+
+| DevLog | Title | Author | Date | Status |
+|--------|-------|--------|------|--------|
+| [DevLog-102](devlog-102-inspection-and-fixes.md) | API Implementation Inspection and Critical Fixes | Wentao | 2025-10-11 | Complete |
 
 ## RFD Status Definitions
 
 - **Draft**: Initial proposal, under discussion
+- **Active**: Currently being worked on
 - **Accepted**: Approved for implementation
 - **Implemented**: Successfully implemented and deployed
+- **Phase 1 Complete**: First phase completed, ongoing work
 - **Superseded**: Replaced by a newer RFD
 - **Rejected**: Not approved for implementation
 
