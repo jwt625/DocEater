@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -38,15 +37,12 @@ class DoclingWrapper:
     def converter(self) -> DocumentConverter:
         """Get or create the Docling converter with enhanced local model configuration."""
         if self._converter is None:
-            # Configure local models path
-            artifacts_path = os.path.expanduser("~/.cache/docling/models")
-
-            # Configure PDF pipeline options with local models
+            # Configure PDF pipeline options without local models for now
             pipeline_options = PdfPipelineOptions(
                 do_ocr=False,  # Disable OCR for now (can be enabled if needed)
                 do_table_structure=True,  # Enable table structure detection
                 do_formula_enrichment=self.enable_formula_enrichment,  # Formula enrichment
-                artifacts_path=artifacts_path,  # Use local models
+                # artifacts_path=None,  # Don't use local models for now
                 # Image extraction options
                 images_scale=self.images_scale,  # Scale for extracted images
                 generate_page_images=False,  # Don't extract full page images
@@ -61,7 +57,7 @@ class DoclingWrapper:
             )
 
             logger.info(
-                f"Initialized Docling converter with local models from {artifacts_path}, "
+                f"Initialized Docling converter with default models, "
                 f"formula enrichment: {self.enable_formula_enrichment}, "
                 f"image extraction: {self.enable_image_extraction} (scale: {self.images_scale}x)"
             )

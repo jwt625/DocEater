@@ -14,7 +14,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+        exclude: ^(tests/|test_.*\.py$)
       - id: ruff-format
+        exclude: ^(tests/|test_.*\.py$)
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.16.1
@@ -24,3 +26,4 @@ repos:
           - types-aiofiles
           - sqlalchemy[mypy]
         args: [--strict, --ignore-missing-imports]
+        exclude: ^(tests/|test_.*\.py$)

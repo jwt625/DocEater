@@ -267,12 +267,12 @@ def list(
                 size_str = f"{size_mb:.1f} MB"
 
                 # Format status with color
-                status_text = Text(doc.status.value)
-                if doc.status == DocumentStatus.COMPLETED:
+                status_text = Text(str(doc.status))
+                if doc.status == DocumentStatus.COMPLETED.value:
                     status_text.style = "green"
-                elif doc.status == DocumentStatus.FAILED:
+                elif doc.status == DocumentStatus.FAILED.value:
                     status_text.style = "red"
-                elif doc.status == DocumentStatus.PROCESSING:
+                elif doc.status == DocumentStatus.PROCESSING.value:
                     status_text.style = "yellow"
                 else:
                     status_text.style = "blue"
@@ -324,7 +324,7 @@ def show(
             console.print(f"📄 Document: {document.filename}")
             console.print(f"🆔 ID: {document.id}")
             console.print(f"📁 Path: {document.file_path}")
-            console.print(f"📊 Status: {document.status.value}")
+            console.print(f"📊 Status: {document.status}")
             console.print(f"📏 Size: {document.file_size / (1024 * 1024):.1f} MB")
             console.print(f"🕒 Created: {document.created_at}")
 

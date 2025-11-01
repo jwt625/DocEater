@@ -153,8 +153,22 @@ class DocumentProcessor:
             # Check if file already exists in database
             existing_doc = await self.db_manager.get_document_by_path(str(file_path))
             if existing_doc:
-                logger.debug(f"File already processed: {file_path}")
-                return True
+                if existing_doc.status == DocumentStatus.COMPLETED:
+                    logger.debug(f"File already successfully processed: {file_path}")
+                    return True
+                elif existing_doc.status == DocumentStatus.PROCESSING:
+                    logger.warning(f"File is currently being processed: {file_path}")
+                    return False
+                else:
+                    # Document exists but failed or pending - allow reprocessing
+                    logger.info(
+                        f"Reprocessing {existing_doc.status} document: {file_path}"
+                    )
+                    # Delete the existing failed/pending document to start fresh
+                    await self.db_manager.delete_document(existing_doc.id)
+                    logger.debug(
+                        f"Deleted existing {existing_doc.status} document: {existing_doc.id}"
+                    )
 
             # Calculate file hash for deduplication
             content_hash = await self.calculate_file_hash(file_path)
