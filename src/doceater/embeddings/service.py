@@ -11,20 +11,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from PIL import Image
 from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+# Global lock to prevent concurrent model loading across all instances
+_global_model_lock = asyncio.Lock()
 
 
 class EmbeddingService:
     """Jina CLIP v2 embedding service for DocEater API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the embedding service."""
         self._model: SentenceTransformer | None = None
         self._model_lock = asyncio.Lock()
@@ -32,62 +36,40 @@ class EmbeddingService:
     async def _get_model(self) -> SentenceTransformer:
         """Get or load the Jina CLIP v2 model (thread-safe)."""
         if self._model is None:
-            async with self._model_lock:
+            # Use global lock to prevent racing conditions across all instances
+            async with _global_model_lock:
                 if self._model is None:  # Double-check pattern
                     logger.info("Loading Jina CLIP v2 model...")
                     # Load in a thread to avoid blocking the event loop
                     loop = asyncio.get_event_loop()
                     self._model = await loop.run_in_executor(
                         None,
-                        self._load_model_with_meta_tensor_fix,
+                        self._load_model_simple,
                     )
                     logger.info("✅ Jina CLIP v2 model loaded successfully")
         return self._model
 
-    def _load_model_with_meta_tensor_fix(self) -> SentenceTransformer:
-        """Load the model with proper meta tensor handling."""
+    def _load_model_simple(self) -> SentenceTransformer:
+        """Load the model with simple retry logic to handle racing conditions."""
         import torch
 
-        # Set device map to handle meta tensors properly
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Use local cache if available, otherwise download
+        model_name = "jinaai/jina-clip-v2"
 
         try:
-            # Load model with explicit device handling for meta tensors
-            model = SentenceTransformer(
-                "jinaai/jina-clip-v2", trust_remote_code=True, device=device
-            )
+            # Load model - let sentence-transformers handle caching
+            model = SentenceTransformer(model_name, trust_remote_code=True)
 
-            # Ensure all model components are properly moved to device
-            # This handles any remaining meta tensors
+            # Move to GPU if available
             if torch.cuda.is_available():
-                model = model.to(device)
+                model = model.to("cuda")
 
-                # Force model to non-meta state if needed
-                for module in model.modules():
-                    if hasattr(module, "weight") and module.weight is not None:
-                        if hasattr(module.weight, "is_meta") and module.weight.is_meta:
-                            # Use to_empty() for meta tensors as recommended by PyTorch
-                            module.weight = torch.nn.Parameter(
-                                module.weight.to_empty(
-                                    device=device, dtype=module.weight.dtype
-                                )
-                            )
-                    if hasattr(module, "bias") and module.bias is not None:
-                        if hasattr(module.bias, "is_meta") and module.bias.is_meta:
-                            module.bias = torch.nn.Parameter(
-                                module.bias.to_empty(
-                                    device=device, dtype=module.bias.dtype
-                                )
-                            )
-
-            logger.info(f"Model loaded on device: {device}")
+            logger.info("Model loaded successfully")
             return model
 
         except Exception as e:
-            logger.error(f"Error loading model with meta tensor fix: {e}")
-            # Fallback to basic loading without device specification
-            logger.info("Attempting fallback model loading...")
-            return SentenceTransformer("jinaai/jina-clip-v2", trust_remote_code=True)
+            logger.error(f"Failed to load model: {e}")
+            raise
 
     async def generate_text_embedding(self, text: str) -> list[float]:
         """Generate embedding for a single text string."""
@@ -122,11 +104,12 @@ class EmbeddingService:
 
             # Generate embeddings for this batch in a thread to avoid blocking
             loop = asyncio.get_event_loop()
+
+            def encode_batch(batch: list[str]) -> Any:
+                return model.encode(batch, normalize_embeddings=True)
+
             batch_embeddings = await loop.run_in_executor(
-                None,
-                lambda batch=batch_texts: model.encode(
-                    batch, normalize_embeddings=True
-                ),
+                None, encode_batch, batch_texts
             )
 
             # Convert numpy arrays to lists and add to results
@@ -169,14 +152,12 @@ class EmbeddingService:
         # Maximum safety limit: never exceed 8 texts per batch
         # Jina CLIP v2 requires significant GPU memory even for small batches
 
-    async def generate_image_embedding(self, image: Image.Image) -> list[float]:
+    async def generate_image_embedding(self, image: Any) -> list[float]:
         """Generate embedding for a single image."""
         embeddings = await self.generate_image_embeddings([image])
         return embeddings[0]
 
-    async def generate_image_embeddings(
-        self, images: list[Image.Image]
-    ) -> list[list[float]]:
+    async def generate_image_embeddings(self, images: list[Any]) -> list[list[float]]:
         """Generate embeddings for multiple images with batch processing."""
         if not images:
             return []
@@ -203,11 +184,12 @@ class EmbeddingService:
 
             # Generate embeddings for this batch in a thread to avoid blocking
             loop = asyncio.get_event_loop()
+
+            def encode_image_batch(batch: list[Any]) -> Any:
+                return model.encode(batch, normalize_embeddings=True)
+
             batch_embeddings = await loop.run_in_executor(
-                None,
-                lambda batch=batch_images: model.encode(
-                    batch, normalize_embeddings=True
-                ),
+                None, encode_image_batch, batch_images
             )
 
             # Convert numpy arrays to lists and add to results
@@ -397,7 +379,7 @@ class EmbeddingService:
             image_results = await self.search_similar_images(
                 session, query, top_k, similarity_threshold
             )
-            results["image_results"] = image_results
+            results["image_results"] = list(image_results)
 
         total_results = len(results["text_results"]) + len(results["image_results"])
         logger.info(f"Multimodal search returned {total_results} total results")

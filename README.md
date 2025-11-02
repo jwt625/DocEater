@@ -29,6 +29,9 @@ cd DocEater
 # Install dependencies
 uv sync --dev
 
+# Download models (first time only)
+uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('jinaai/jina-clip-v2', trust_remote_code=True)"
+
 # Configure environment
 cp .env.example .env
 # Edit .env with your settings
