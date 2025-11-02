@@ -11,6 +11,28 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc import ImageRefMode, PictureItem, TableItem
 from loguru import logger
 
+# Global converter instance to avoid reloading models on every request
+_global_converter: DocumentConverter | None = None
+
+# Global wrapper instance
+_global_wrapper: DoclingWrapper | None = None
+
+
+def get_docling_wrapper(
+    enable_formula_enrichment: bool = True,
+    enable_image_extraction: bool = True,
+    images_scale: float = 2.0,
+) -> DoclingWrapper:
+    """Get the global DoclingWrapper instance."""
+    global _global_wrapper
+    if _global_wrapper is None:
+        _global_wrapper = DoclingWrapper(
+            enable_formula_enrichment=enable_formula_enrichment,
+            enable_image_extraction=enable_image_extraction,
+            images_scale=images_scale,
+        )
+    return _global_wrapper
+
 
 class DoclingWrapper:
     """Wrapper for Docling with enhanced configuration including formula enrichment and image extraction."""
@@ -31,12 +53,12 @@ class DoclingWrapper:
         self.enable_formula_enrichment = enable_formula_enrichment
         self.enable_image_extraction = enable_image_extraction
         self.images_scale = images_scale
-        self._converter: DocumentConverter | None = None
 
     @property
     def converter(self) -> DocumentConverter:
-        """Get or create the Docling converter with enhanced local model configuration."""
-        if self._converter is None:
+        """Get or create the global Docling converter with enhanced local model configuration."""
+        global _global_converter
+        if _global_converter is None:
             # Configure PDF pipeline options without local models for now
             pipeline_options = PdfPipelineOptions(
                 do_ocr=False,  # Disable OCR for now (can be enabled if needed)
@@ -50,19 +72,19 @@ class DoclingWrapper:
             )
 
             # Create converter with enhanced configuration
-            self._converter = DocumentConverter(
+            _global_converter = DocumentConverter(
                 format_options={
                     InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
                 }
             )
 
             logger.info(
-                f"Initialized Docling converter with default models, "
+                f"Initialized global Docling converter with default models, "
                 f"formula enrichment: {self.enable_formula_enrichment}, "
                 f"image extraction: {self.enable_image_extraction} (scale: {self.images_scale}x)"
             )
 
-        return self._converter
+        return _global_converter
 
     def convert_document(self, file_path: Path | str) -> Any:
         """Convert a document to Docling format.
@@ -93,8 +115,6 @@ class DoclingWrapper:
         """
         result = self.convert_document(file_path)
         return result.document.export_to_markdown()
-
-
 
     def convert_to_markdown_with_storage(
         self,

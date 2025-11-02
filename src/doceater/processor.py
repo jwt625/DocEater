@@ -11,7 +11,7 @@ from loguru import logger
 
 from .config import Settings, get_settings
 from .database import DatabaseManager, get_db_manager
-from .docling_wrapper import DoclingWrapper
+from .docling_wrapper import DoclingWrapper, get_docling_wrapper
 from .image_storage import ImageStorageManager
 from .models import DocumentStatus, LogLevel
 
@@ -29,20 +29,15 @@ class DocumentProcessor:
         self.settings = settings or get_settings()
         self.db_manager = db_manager or get_db_manager()
         self.image_storage = image_storage or ImageStorageManager(self.settings)
-        self._docling_wrapper: DoclingWrapper | None = None
         self.enable_formula_enrichment = enable_formula_enrichment
 
     @property
     def docling_wrapper(self) -> DoclingWrapper:
-        """Get or create the Docling wrapper."""
-        if self._docling_wrapper is None:
-            self._docling_wrapper = DoclingWrapper(
-                enable_formula_enrichment=self.enable_formula_enrichment,
-                enable_image_extraction=self.settings.images_enabled,
-            )
-            logger.info("Initialized Docling wrapper with enhanced configuration")
-
-        return self._docling_wrapper
+        """Get the global Docling wrapper."""
+        return get_docling_wrapper(
+            enable_formula_enrichment=self.enable_formula_enrichment,
+            enable_image_extraction=self.settings.images_enabled,
+        )
 
     async def calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of a file."""

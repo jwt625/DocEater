@@ -32,12 +32,25 @@ async def lifespan(app: FastAPI):
     logger.info("🤖 Pre-loading embedding model...")
     try:
         from ..embeddings.service import get_embedding_service
+
         embedding_service = get_embedding_service()
         # Trigger model loading with a dummy embedding
         await embedding_service.generate_text_embedding("warmup")
         logger.info("✅ Embedding model pre-loaded successfully")
     except Exception as e:
         logger.error(f"❌ Failed to pre-load embedding model: {e}")
+
+    # Initialize and warm up Docling converter
+    logger.info("📄 Pre-loading Docling converter...")
+    try:
+        from ..docling_wrapper import get_docling_wrapper
+
+        docling_wrapper = get_docling_wrapper()
+        # Trigger converter initialization by accessing the property
+        _ = docling_wrapper.converter
+        logger.info("✅ Docling converter pre-loaded successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to pre-load Docling converter: {e}")
         # Don't fail startup, but log the error
 
     logger.info("✅ DocEater API server started successfully")

@@ -76,7 +76,9 @@ async def get_image(
                 filename=f"image_{image_id}{image_path.suffix}",
                 headers={
                     "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-                    "X-Image-Type": image_record.image_type.value,
+                    "X-Image-Type": image_record.image_type.value
+                    if hasattr(image_record.image_type, "value")
+                    else str(image_record.image_type),
                     "X-Image-Index": str(image_record.image_index),
                 },
             )
