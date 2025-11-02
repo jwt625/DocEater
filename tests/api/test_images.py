@@ -29,7 +29,9 @@ class TestImageServing:
         test_image_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82"
         test_image_path.write_bytes(test_image_content)
 
-        with patch("doceater.api.routes.images.get_db_manager") as mock_get_db:
+        with patch("doceater.api.routes.images.get_db_manager") as mock_get_db, \
+             patch("doceater.api.routes.images.ImageStorageManager") as mock_storage_class:
+
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
 
@@ -41,13 +43,19 @@ class TestImageServing:
 
             mock_image = MagicMock(spec=DocumentImage)
             mock_image.id = image_id
-            mock_image.file_path = str(test_image_path)
+            mock_image.document_id = uuid4()
+            mock_image.image_path = "test/path/image.png"
             mock_image.image_type = ImageType.PICTURE
-            mock_image.page_number = 1
+            mock_image.image_index = 1
 
             mock_result = MagicMock()
             mock_result.scalar_one_or_none.return_value = mock_image
             mock_session.execute.return_value = mock_result
+
+            # Mock ImageStorageManager to return the actual test file path
+            mock_storage = AsyncMock()
+            mock_storage.get_image_path.return_value = test_image_path
+            mock_storage_class.return_value = mock_storage
 
             response = test_client.get(
                 f"/api/v1/images/{image_id}", headers=auth_headers
@@ -57,7 +65,7 @@ class TestImageServing:
             assert response.headers["content-type"] == "image/png"
             assert "Cache-Control" in response.headers
             assert response.headers["X-Image-Type"] == "picture"
-            assert response.headers["X-Page-Number"] == "1"
+            assert response.headers["X-Image-Index"] == "1"
 
     def test_serve_image_not_found(
         self,
@@ -109,9 +117,10 @@ class TestImageServing:
 
             mock_image = MagicMock(spec=DocumentImage)
             mock_image.id = image_id
-            mock_image.file_path = missing_file_path
+            mock_image.document_id = uuid4()
+            mock_image.image_path = "nonexistent/path/image.png"
             mock_image.image_type = ImageType.PICTURE
-            mock_image.page_number = 1
+            mock_image.image_index = 1
 
             mock_result = MagicMock()
             mock_result.scalar_one_or_none.return_value = mock_image
@@ -151,7 +160,9 @@ class TestImageServing:
             test_image_path = temp_dir / filename
             test_image_path.write_bytes(content + b"fake_image_data")
 
-            with patch("doceater.api.routes.images.get_db_manager") as mock_get_db:
+            with patch("doceater.api.routes.images.get_db_manager") as mock_get_db, \
+                 patch("doceater.api.routes.images.ImageStorageManager") as mock_storage_class:
+
                 mock_db_manager = AsyncMock()
                 mock_get_db.return_value = mock_db_manager
 
@@ -163,13 +174,19 @@ class TestImageServing:
 
                 mock_image = MagicMock(spec=DocumentImage)
                 mock_image.id = image_id
-                mock_image.file_path = str(test_image_path)
+                mock_image.document_id = uuid4()
+                mock_image.image_path = "test/path/image.png"
                 mock_image.image_type = ImageType.PICTURE
-                mock_image.page_number = 1
+                mock_image.image_index = 1
 
                 mock_result = MagicMock()
                 mock_result.scalar_one_or_none.return_value = mock_image
                 mock_session.execute.return_value = mock_result
+
+                # Mock ImageStorageManager to return the actual test file path
+                mock_storage = AsyncMock()
+                mock_storage.get_image_path.return_value = test_image_path
+                mock_storage_class.return_value = mock_storage
 
                 response = test_client.get(
                     f"/api/v1/images/{image_id}", headers=auth_headers
@@ -191,7 +208,9 @@ class TestImageServing:
         test_image_path = temp_dir / "test_image.png"
         test_image_path.write_bytes(b"fake_png_data")
 
-        with patch("doceater.api.routes.images.get_db_manager") as mock_get_db:
+        with patch("doceater.api.routes.images.get_db_manager") as mock_get_db, \
+             patch("doceater.api.routes.images.ImageStorageManager") as mock_storage_class:
+
             mock_db_manager = AsyncMock()
             mock_get_db.return_value = mock_db_manager
 
@@ -203,13 +222,19 @@ class TestImageServing:
 
             mock_image = MagicMock(spec=DocumentImage)
             mock_image.id = image_id
-            mock_image.file_path = str(test_image_path)
+            mock_image.document_id = uuid4()
+            mock_image.image_path = "test/path/image.png"
             mock_image.image_type = ImageType.TABLE
-            mock_image.page_number = 2
+            mock_image.image_index = 2
 
             mock_result = MagicMock()
             mock_result.scalar_one_or_none.return_value = mock_image
             mock_session.execute.return_value = mock_result
+
+            # Mock ImageStorageManager to return the actual test file path
+            mock_storage = AsyncMock()
+            mock_storage.get_image_path.return_value = test_image_path
+            mock_storage_class.return_value = mock_storage
 
             response = test_client.get(
                 f"/api/v1/images/{image_id}", headers=auth_headers
@@ -220,7 +245,7 @@ class TestImageServing:
             assert "public" in response.headers["Cache-Control"]
             assert "max-age" in response.headers["Cache-Control"]
             assert response.headers["X-Image-Type"] == "table"
-            assert response.headers["X-Page-Number"] == "2"
+            assert response.headers["X-Image-Index"] == "2"
 
     def test_serve_image_database_error(
         self,

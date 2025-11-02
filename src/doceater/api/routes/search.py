@@ -238,31 +238,17 @@ async def find_similar_documents(
                 )
 
                 for row in result:
-                    doc_id = (
-                        row.document_id
-                        if hasattr(row, "document_id")
-                        else row["document_id"]
-                    )
+                    doc_id = row.document_id
                     if doc_id not in seen_documents:
                         search_result = SearchResult(
-                            id=row.id if hasattr(row, "id") else row["id"],
+                            id=row.id,
                             document_id=doc_id,
-                            document_filename=row.filename
-                            if hasattr(row, "filename")
-                            else row["filename"],
+                            document_filename=row.filename,
                             content_type="text",
-                            content=row.chunk_text
-                            if hasattr(row, "chunk_text")
-                            else row["chunk_text"],
-                            similarity_score=row.similarity_score
-                            if hasattr(row, "similarity_score")
-                            else row["similarity_score"],
-                            page_number=row.page_number
-                            if hasattr(row, "page_number")
-                            else row.get("page_number"),
-                            bbox_coordinates=row.bbox_coordinates
-                            if hasattr(row, "bbox_coordinates")
-                            else row.get("bbox_coordinates"),
+                            content=row.chunk_text,
+                            similarity_score=row.similarity_score,
+                            page_number=row.page_number,
+                            bbox_coordinates=row.bbox_coordinates,
                             image_id=None,
                             image_url=None,
                             image_type=None,
@@ -311,31 +297,19 @@ async def find_similar_documents(
                 )
 
                 for row in result:
-                    doc_id = (
-                        row.document_id
-                        if hasattr(row, "document_id")
-                        else row["document_id"]
-                    )
+                    doc_id = row.document_id
                     if doc_id not in seen_documents:
                         search_result = SearchResult(
-                            id=row.id if hasattr(row, "id") else row["id"],
+                            id=row.id,
                             document_id=doc_id,
-                            document_filename=row.document_filename
-                            if hasattr(row, "document_filename")
-                            else row["document_filename"],
+                            document_filename=row.document_filename,
                             content_type="image",
-                            content=row.description
-                            if hasattr(row, "description")
-                            else row.get("description", "Image content"),
-                            similarity_score=row.similarity_score
-                            if hasattr(row, "similarity_score")
-                            else row["similarity_score"],
+                            content=row.description or "Image content",
+                            similarity_score=row.similarity_score,
                             page_number=None,
                             bbox_coordinates=None,
-                            image_id=row.document_image_id
-                            if hasattr(row, "document_image_id")
-                            else row["document_image_id"],
-                            image_url=f"/api/v1/images/{row.document_image_id if hasattr(row, 'document_image_id') else row['document_image_id']}",
+                            image_id=row.document_image_id,
+                            image_url=f"/api/v1/images/{row.document_image_id}",
                             image_type=None,
                         )
                         all_results.append(search_result)

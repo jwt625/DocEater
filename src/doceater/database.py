@@ -52,7 +52,7 @@ class DatabaseManager:
             # For other databases, assume they're already properly formatted
 
             # Configure engine parameters based on database type
-            engine_kwargs = {
+            engine_kwargs: dict[str, Any] = {
                 "echo": self.settings.log_level == "DEBUG",
                 "pool_pre_ping": True,
             }
@@ -286,7 +286,11 @@ class DatabaseManager:
             )
             metadata_entries = result.scalars().all()
 
-            return {entry.key: entry.value for entry in metadata_entries}
+            return {
+                entry.key: entry.value
+                for entry in metadata_entries
+                if entry.value is not None
+            }
 
     # Image operations
     async def create_document_image(

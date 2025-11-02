@@ -1,6 +1,5 @@
 """Image serving endpoints."""
 
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,6 +8,7 @@ from loguru import logger
 
 from ...config import get_settings
 from ...database import get_db_manager
+from ...image_storage import ImageStorageManager
 from ...models import DocumentImage
 from ..auth import TokenData, get_current_user
 
@@ -44,8 +44,12 @@ async def get_image(
                     status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
                 )
 
-            # Check if file exists
-            image_path = Path(image_record.file_path)
+            # Get full image path using ImageStorageManager
+            image_storage = ImageStorageManager(settings)
+            image_path = await image_storage.get_image_path(
+                image_record.document_id, image_record.image_path
+            )
+
             if not image_path.exists():
                 logger.error(f"Image file not found: {image_path}")
                 raise HTTPException(
@@ -73,7 +77,7 @@ async def get_image(
                 headers={
                     "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
                     "X-Image-Type": image_record.image_type.value,
-                    "X-Page-Number": str(image_record.page_number),
+                    "X-Image-Index": str(image_record.image_index),
                 },
             )
 
