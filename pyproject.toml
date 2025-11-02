@@ -128,3 +128,7 @@ dev = [
     "ruff>=0.12.2",
     "types-aiofiles>=24.1.0.20250606",
 ]
+test = [
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.13.2",
+]

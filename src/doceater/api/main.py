@@ -28,8 +28,17 @@ async def lifespan(app: FastAPI):
     init_auth_config(settings)
     logger.info("🔐 Authentication system initialized")
 
-    # TODO: Initialize embedding service
-    # TODO: Warm up models if needed
+    # Initialize and warm up embedding service
+    logger.info("🤖 Pre-loading embedding model...")
+    try:
+        from ..embeddings.service import get_embedding_service
+        embedding_service = get_embedding_service()
+        # Trigger model loading with a dummy embedding
+        await embedding_service.generate_text_embedding("warmup")
+        logger.info("✅ Embedding model pre-loaded successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to pre-load embedding model: {e}")
+        # Don't fail startup, but log the error
 
     logger.info("✅ DocEater API server started successfully")
 

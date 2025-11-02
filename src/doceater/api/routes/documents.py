@@ -333,6 +333,96 @@ async def get_document(
         )
 
 
+@router.post("/documents/{document_id}/reprocess")
+async def reprocess_document(
+    document_id: UUID,
+    file: UploadFile = File(..., description="New PDF file to reprocess"),
+    current_user: TokenData = Depends(require_write),
+    settings=Depends(get_settings),
+):
+    """
+    Reprocess a document with a new PDF file.
+
+    This will:
+    - Reset the document status to PENDING
+    - Clear existing embeddings and processing data
+    - Upload the new PDF file
+    - Start background processing with the new file
+
+    Useful for documents that failed or when you have an updated/fixed version of the PDF.
+    """
+    try:
+        # Validate file type
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only PDF files are supported"
+            )
+
+        # Validate file size
+        validate_file_size(file, settings.max_file_size_mb)
+
+        db_manager = get_db_manager()
+        processing_service = DocumentProcessingService(settings)
+
+        # Get document
+        document = await db_manager.get_document_by_id(document_id)
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found",
+            )
+
+        # Check if document can be reprocessed
+        if document.status == DocumentStatus.PROCESSING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Document is currently being processed. Please wait for completion.",
+            )
+
+        # Save the new file to temporary location
+        temp_dir = Path(settings.temp_upload_dir)
+        new_file_path = await save_upload_file(file, temp_dir)
+
+        logger.info(f"Saved new file for reprocessing: {new_file_path}")
+
+        # Reset document status and clear existing data
+        await db_manager.update_document_status(document_id, DocumentStatus.PENDING)
+
+        # Clear existing embeddings to avoid duplicates
+        await db_manager.delete_text_embeddings(document_id)
+        await db_manager.delete_image_embeddings(document_id)
+
+        # Clear existing images to avoid duplicates
+        await db_manager.delete_document_images(document_id)
+
+        # Update document with new file path and filename
+        await db_manager.update_document_file_info(document_id, str(new_file_path), file.filename)
+
+        logger.info(f"Document {document_id} reset for reprocessing by user {current_user.user_id}")
+
+        # Start background processing with the new file
+        processing_service.start_background_processing(document_id, new_file_path)
+
+        logger.info(f"Started reprocessing for document {document_id} with new file: {new_file_path}")
+
+        return {
+            "message": "Document reprocessing started with new file",
+            "document_id": document_id,
+            "filename": file.filename,
+            "status": "pending"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to reprocess document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reprocess document: {str(e)}",
+        )
+
+
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: UUID,

@@ -198,6 +198,26 @@ class DatabaseManager:
 
         logger.debug(f"Updated document status: {document_id} -> {status}")
 
+    async def update_document_file_info(
+        self,
+        document_id: uuid.UUID,
+        file_path: str,
+        filename: str,
+    ) -> None:
+        """Update document file path and filename."""
+        async with self.get_session() as session:
+            await session.execute(
+                update(Document)
+                .where(Document.id == document_id)
+                .values(
+                    file_path=file_path,
+                    filename=filename,
+                )
+            )
+            await session.commit()
+
+        logger.debug(f"Updated document file info: {document_id} -> {filename}")
+
     async def list_documents(
         self,
         status: DocumentStatus | None = None,

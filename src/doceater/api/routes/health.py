@@ -12,6 +12,7 @@ from ...database import get_db_manager
 from ..auth import TokenData, get_current_user, get_current_user_optional
 from ..models.responses import HealthResponse, StatsResponse
 from ..services import DocumentProcessingService
+from ...embeddings.service import get_embedding_service
 
 router = APIRouter()
 
@@ -44,14 +45,11 @@ async def health_check(
         logger.error(f"Database health check failed: {e}")
         db_status = "unhealthy"
 
-    # Check embedding model status
+    # Check embedding model status using global service
     model_status = "not_loaded"
     try:
-        processing_service = DocumentProcessingService(settings)
-        status_info = await processing_service.get_processing_status()
-        model_status = (
-            "loaded" if status_info["embedding_model_loaded"] else "not_loaded"
-        )
+        embedding_service = get_embedding_service()
+        model_status = "loaded" if embedding_service.is_model_loaded else "not_loaded"
     except Exception as e:
         logger.error(f"Embedding model health check failed: {e}")
         model_status = "error"
