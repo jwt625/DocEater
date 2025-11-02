@@ -17,7 +17,7 @@ from loguru import logger
 from doceater.config import Settings
 from doceater.database import DatabaseManager
 from doceater.embeddings.service import EmbeddingService
-from doceater.models import DocumentStatus
+from doceater.models import DocumentStatus, LogLevel
 from doceater.processor import DocumentProcessor
 
 
@@ -68,7 +68,9 @@ class DocumentProcessingService:
                 return
 
             # Step 2: Generate embeddings for the processed content
+            logger.info(f"Starting embedding generation for document {document_id}")
             await self._generate_embeddings(document_id)
+            logger.info(f"Completed embedding generation for document {document_id}")
 
             # Step 3: Update final status
             await self.db_manager.update_document_status(
@@ -79,6 +81,15 @@ class DocumentProcessingService:
 
         except Exception as e:
             logger.error(f"Error processing document {document_id}: {e}")
+
+            # Log the error to the processing logs table for debugging
+            await self.db_manager.log_processing(
+                LogLevel.ERROR,
+                f"Document processing failed: {str(e)}",
+                document_id,
+                {"error": str(e), "error_type": type(e).__name__},
+            )
+
             await self.db_manager.update_document_status(
                 document_id, DocumentStatus.FAILED
             )

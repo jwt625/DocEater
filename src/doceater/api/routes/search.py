@@ -92,12 +92,28 @@ async def search_documents(
                 # Convert image results to SearchResult format
                 for result in image_results:
                     # Results are dictionaries from embedding service
+                    # Build content from available fields
+                    content_parts = []
+                    if result.get("description"):
+                        content_parts.append(result["description"])
+                    if result.get("ocr_text"):
+                        content_parts.append(f"OCR: {result['ocr_text']}")
+                    if result.get("image_filename"):
+                        content_parts.append(f"File: {result['image_filename']}")
+
+                    # Use combined content or fallback to filename
+                    content = (
+                        " | ".join(content_parts)
+                        if content_parts
+                        else f"Image {result.get('image_index', '')}"
+                    )
+
                     search_result = SearchResult(
                         id=result["id"],
                         document_id=result["document_id"],
                         document_filename=result["document_filename"],
                         content_type="image",
-                        content=result.get("description", "Image content"),
+                        content=content,
                         similarity_score=result["similarity_score"],
                         page_number=None,  # Images don't have page numbers in current schema
                         bbox_coordinates=None,  # Images don't have bbox in current schema
@@ -299,12 +315,28 @@ async def find_similar_documents(
                 for row in result:
                     doc_id = row.document_id
                     if doc_id not in seen_documents:
+                        # Build content from available fields
+                        content_parts = []
+                        if row.description:
+                            content_parts.append(row.description)
+                        if row.ocr_text:
+                            content_parts.append(f"OCR: {row.ocr_text}")
+                        if row.image_filename:
+                            content_parts.append(f"File: {row.image_filename}")
+
+                        # Use combined content or fallback to filename
+                        content = (
+                            " | ".join(content_parts)
+                            if content_parts
+                            else f"Image {row.image_index or ''}"
+                        )
+
                         search_result = SearchResult(
                             id=row.id,
                             document_id=doc_id,
                             document_filename=row.document_filename,
                             content_type="image",
-                            content=row.description or "Image content",
+                            content=content,
                             similarity_score=row.similarity_score,
                             page_number=None,
                             bbox_coordinates=None,

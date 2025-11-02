@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Set PyTorch CUDA memory management for better GPU memory handling
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 
 class Settings(BaseSettings):
@@ -206,10 +210,6 @@ class Settings(BaseSettings):
         if v > 500:  # 500MB limit per image
             raise ValueError("images_max_size_mb cannot exceed 500MB")
         return v
-
-
-
-
 
     @property
     def images_max_size_bytes(self) -> int:

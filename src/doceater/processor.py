@@ -145,6 +145,10 @@ class DocumentProcessor:
             file_path: Path to the file to process
             existing_document_id: If provided, use this existing document record instead of creating a new one
         """
+        # Initialize variables that might be used in exception handler
+        file_size = None
+        mime_type = None
+
         try:
             # Validate file
             if not self.is_supported_file(file_path):
@@ -341,7 +345,12 @@ class DocumentProcessor:
                     partial_content = (
                         f"# {file_path.name}\n\n*File processing failed: {e}*\n\n"
                     )
-                    partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
+
+                    # Add file information if available
+                    if file_size is not None:
+                        partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
+                    else:
+                        partial_content += f"File information:\n- Path: {file_path}\n- Error occurred during initial file processing\n"
 
                     await self.db_manager.update_document_content(
                         document_id,

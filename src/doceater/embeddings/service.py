@@ -39,12 +39,55 @@ class EmbeddingService:
                     loop = asyncio.get_event_loop()
                     self._model = await loop.run_in_executor(
                         None,
-                        lambda: SentenceTransformer(
-                            "jinaai/jina-clip-v2", trust_remote_code=True
-                        ),
+                        self._load_model_with_meta_tensor_fix,
                     )
                     logger.info("✅ Jina CLIP v2 model loaded successfully")
         return self._model
+
+    def _load_model_with_meta_tensor_fix(self) -> SentenceTransformer:
+        """Load the model with proper meta tensor handling."""
+        import torch
+
+        # Set device map to handle meta tensors properly
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        try:
+            # Load model with explicit device handling for meta tensors
+            model = SentenceTransformer(
+                "jinaai/jina-clip-v2", trust_remote_code=True, device=device
+            )
+
+            # Ensure all model components are properly moved to device
+            # This handles any remaining meta tensors
+            if torch.cuda.is_available():
+                model = model.to(device)
+
+                # Force model to non-meta state if needed
+                for module in model.modules():
+                    if hasattr(module, "weight") and module.weight is not None:
+                        if hasattr(module.weight, "is_meta") and module.weight.is_meta:
+                            # Use to_empty() for meta tensors as recommended by PyTorch
+                            module.weight = torch.nn.Parameter(
+                                module.weight.to_empty(
+                                    device=device, dtype=module.weight.dtype
+                                )
+                            )
+                    if hasattr(module, "bias") and module.bias is not None:
+                        if hasattr(module.bias, "is_meta") and module.bias.is_meta:
+                            module.bias = torch.nn.Parameter(
+                                module.bias.to_empty(
+                                    device=device, dtype=module.bias.dtype
+                                )
+                            )
+
+            logger.info(f"Model loaded on device: {device}")
+            return model
+
+        except Exception as e:
+            logger.error(f"Error loading model with meta tensor fix: {e}")
+            # Fallback to basic loading without device specification
+            logger.info("Attempting fallback model loading...")
+            return SentenceTransformer("jinaai/jina-clip-v2", trust_remote_code=True)
 
     async def generate_text_embedding(self, text: str) -> list[float]:
         """Generate embedding for a single text string."""
@@ -52,24 +95,79 @@ class EmbeddingService:
         return embeddings[0]
 
     async def generate_text_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for multiple text strings."""
+        """Generate embeddings for multiple text strings with batch processing."""
         if not texts:
             return []
 
         model = await self._get_model()
-        logger.debug(f"Generating embeddings for {len(texts)} text chunks")
+        total_texts = len(texts)
+        logger.debug(f"Generating embeddings for {total_texts} text chunks")
 
-        # Generate embeddings in a thread to avoid blocking
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: model.encode(texts, normalize_embeddings=True),
+        # Batch processing to avoid GPU memory overflow
+        # Adjust batch size based on available GPU memory and text length
+        batch_size = self._calculate_optimal_batch_size(texts)
+        logger.debug(f"Using batch size: {batch_size} for {total_texts} texts")
+
+        all_embeddings = []
+
+        # Process in batches
+        for i in range(0, total_texts, batch_size):
+            batch_texts = texts[i : i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_texts + batch_size - 1) // batch_size
+
+            logger.debug(
+                f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)"
+            )
+
+            # Generate embeddings for this batch in a thread to avoid blocking
+            loop = asyncio.get_event_loop()
+            batch_embeddings = await loop.run_in_executor(
+                None,
+                lambda batch=batch_texts: model.encode(
+                    batch, normalize_embeddings=True
+                ),
+            )
+
+            # Convert numpy arrays to lists and add to results
+            batch_result = [embedding.tolist() for embedding in batch_embeddings]
+            all_embeddings.extend(batch_result)
+
+            # Force garbage collection between batches to free GPU memory
+            import gc
+
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+        logger.debug(
+            f"✅ Generated {len(all_embeddings)} text embeddings in {total_batches} batches"
         )
+        return all_embeddings
 
-        # Convert numpy arrays to lists
-        result = [embedding.tolist() for embedding in embeddings]
-        logger.debug(f"✅ Generated {len(result)} text embeddings")
-        return result
+    def _calculate_optimal_batch_size(self, texts: list[str]) -> int:
+        """Calculate optimal batch size based on text characteristics and available GPU memory."""
+        if not texts:
+            return 4
+
+        # Estimate average text length
+        avg_length = sum(len(text) for text in texts) / len(texts)
+
+        # Very conservative batch size calculation for Jina CLIP v2
+        # This model has extremely high memory requirements
+        if avg_length > 2000:  # Very long texts
+            return 1  # Process one at a time
+        elif avg_length > 1000:  # Long texts
+            return 2
+        elif avg_length > 500:  # Medium texts
+            return 4
+        else:  # Short texts
+            return 8
+
+        # Maximum safety limit: never exceed 8 texts per batch
+        # Jina CLIP v2 requires significant GPU memory even for small batches
 
     async def generate_image_embedding(self, image: Image.Image) -> list[float]:
         """Generate embedding for a single image."""
@@ -79,24 +177,56 @@ class EmbeddingService:
     async def generate_image_embeddings(
         self, images: list[Image.Image]
     ) -> list[list[float]]:
-        """Generate embeddings for multiple images."""
+        """Generate embeddings for multiple images with batch processing."""
         if not images:
             return []
 
         model = await self._get_model()
-        logger.debug(f"Generating embeddings for {len(images)} images")
+        total_images = len(images)
+        logger.debug(f"Generating embeddings for {total_images} images")
 
-        # Generate embeddings in a thread to avoid blocking
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: model.encode(images, normalize_embeddings=True),
+        # Batch processing for images (images are generally more memory-intensive)
+        batch_size = min(16, total_images)  # Conservative batch size for images
+        logger.debug(f"Using batch size: {batch_size} for {total_images} images")
+
+        all_embeddings = []
+
+        # Process in batches
+        for i in range(0, total_images, batch_size):
+            batch_images = images[i : i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_images + batch_size - 1) // batch_size
+
+            logger.debug(
+                f"Processing image batch {batch_num}/{total_batches} ({len(batch_images)} images)"
+            )
+
+            # Generate embeddings for this batch in a thread to avoid blocking
+            loop = asyncio.get_event_loop()
+            batch_embeddings = await loop.run_in_executor(
+                None,
+                lambda batch=batch_images: model.encode(
+                    batch, normalize_embeddings=True
+                ),
+            )
+
+            # Convert numpy arrays to lists and add to results
+            batch_result = [embedding.tolist() for embedding in batch_embeddings]
+            all_embeddings.extend(batch_result)
+
+            # Force garbage collection between batches to free GPU memory
+            import gc
+
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+        logger.debug(
+            f"✅ Generated {len(all_embeddings)} image embeddings in {total_batches} batches"
         )
-
-        # Convert numpy arrays to lists
-        result = [embedding.tolist() for embedding in embeddings]
-        logger.debug(f"✅ Generated {len(result)} image embeddings")
-        return result
+        return all_embeddings
 
     async def search_similar_text(
         self,

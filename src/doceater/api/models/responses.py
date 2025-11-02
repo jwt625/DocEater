@@ -70,7 +70,7 @@ class SearchResult(BaseModel):
     document_id: UUID = Field(..., description="Source document ID")
     document_filename: str = Field(..., description="Source document filename")
     content_type: str = Field(..., description="Result type: 'text' or 'image'")
-    content: str = Field(..., description="Text content or image description")
+    content: str | None = Field(None, description="Text content or image description")
     similarity_score: float = Field(..., description="Similarity score (0.0-1.0)")
 
     # Grounding information
