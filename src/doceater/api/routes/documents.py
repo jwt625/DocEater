@@ -49,11 +49,15 @@ def validate_file_size(file: UploadFile, max_size_mb: int) -> None:
 
 async def save_upload_file(upload_file: UploadFile, temp_dir: Path) -> Path:
     """Save uploaded file to temporary location."""
+    import uuid
+
     # Create temp directory if it doesn't exist
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create temporary file with original filename
-    temp_file = temp_dir / f"upload_{upload_file.filename}"
+    # Create temporary file with unique name to avoid conflicts
+    # Use UUID to ensure uniqueness even with same filename
+    unique_id = uuid.uuid4().hex[:8]
+    temp_file = temp_dir / f"upload_{unique_id}_{upload_file.filename}"
 
     try:
         # Stream file to disk to avoid loading into memory
@@ -251,7 +255,11 @@ async def list_documents(
             # Convert to response models
             document_responses = []
             for doc in documents:
-                # TODO: Get embedding and image counts
+                # Get actual embedding and image counts
+                text_embeddings = await db_manager.get_text_embeddings(doc.id)
+                image_embeddings = await db_manager.get_image_embeddings(doc.id)
+                images = await db_manager.get_document_images(doc.id)
+
                 document_responses.append(
                     DocumentResponse(
                         id=doc.id,
@@ -263,9 +271,9 @@ async def list_documents(
                         updated_at=doc.updated_at,
                         markdown_content=doc.markdown_content,
                         page_count=None,
-                        text_embedding_count=0,
-                        image_embedding_count=0,
-                        image_count=0,
+                        text_embedding_count=len(text_embeddings),
+                        image_embedding_count=len(image_embeddings),
+                        image_count=len(images),
                         metadata={},
                     )
                 )
