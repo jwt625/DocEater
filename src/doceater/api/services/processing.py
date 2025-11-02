@@ -98,7 +98,7 @@ class DocumentProcessingService:
         """Generate text and image embeddings for a processed document."""
         try:
             # Get the document to access its content
-            document = await self.db_manager.get_document(document_id)
+            document = await self.db_manager.get_document_by_id(document_id)
             if not document or not document.markdown_content:
                 logger.warning(f"No content found for document {document_id}")
                 return
@@ -166,7 +166,7 @@ class DocumentProcessingService:
             # Load images and generate embeddings
             from PIL import Image
 
-            from doceater.storage import ImageStorageManager
+            from doceater.image_storage import ImageStorageManager
 
             image_storage = ImageStorageManager(self.settings)
             pil_images = []

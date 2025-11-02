@@ -8,14 +8,47 @@ from enum import Enum
 from typing import Any
 
 from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, String, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import UserDefinedType
 
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
 
     pass
+
+
+class Vector(UserDefinedType):
+    """Custom SQLAlchemy type for PostgreSQL vector columns."""
+
+    def __init__(self, dimension: int = 1024):
+        self.dimension = dimension
+
+    def get_col_spec(self):
+        return f"vector({self.dimension})"
+
+    def bind_processor(self, dialect):
+        def process(value):
+            if value is None:
+                return None
+            # Convert list of floats to PostgreSQL vector format
+            if isinstance(value, list):
+                return "[" + ",".join(map(str, value)) + "]"
+            return value
+
+        return process
+
+    def result_processor(self, dialect, coltype):
+        def process(value):
+            if value is None:
+                return None
+            # Convert PostgreSQL vector format back to list of floats
+            if isinstance(value, str) and value.startswith("[") and value.endswith("]"):
+                return [float(x) for x in value[1:-1].split(",")]
+            return value
+
+        return process
 
 
 class DocumentStatus(str, Enum):
@@ -251,7 +284,7 @@ class TextEmbedding(Base):
         Text, nullable=False, comment="Text content of the chunk"
     )
     embedding: Mapped[list[float]] = mapped_column(
-        ARRAY(item_type=Text),
+        Vector(1024),
         nullable=False,
         comment="1024-dimensional embedding vector from Jina CLIP v2",
     )
@@ -304,7 +337,7 @@ class ImageEmbedding(Base):
 
     # Embedding and metadata
     embedding: Mapped[list[float]] = mapped_column(
-        ARRAY(item_type=Text),
+        Vector(1024),
         nullable=False,
         comment="1024-dimensional embedding vector from Jina CLIP v2",
     )
