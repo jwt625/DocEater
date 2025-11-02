@@ -16,7 +16,7 @@ from loguru import logger
 
 from doceater.config import Settings
 from doceater.database import DatabaseManager
-from doceater.embeddings.service import EmbeddingService
+from doceater.embeddings.service import get_embedding_service
 from doceater.models import DocumentStatus, LogLevel
 from doceater.processor import DocumentProcessor
 
@@ -29,7 +29,7 @@ class DocumentProcessingService:
         self.settings = settings
         self.db_manager = DatabaseManager(settings)
         self.document_processor = DocumentProcessor(settings)
-        self.embedding_service = EmbeddingService()
+        self.embedding_service = get_embedding_service()
         self._processing_tasks: set[asyncio.Task] = set()
 
     async def process_document_async(
@@ -257,7 +257,7 @@ class DocumentProcessingService:
 
         return {
             "active_processing_tasks": active_tasks,
-            "embedding_model_loaded": self.embedding_service._model is not None,
+            "embedding_model_loaded": self.embedding_service.is_model_loaded,
             **stats,
         }
 

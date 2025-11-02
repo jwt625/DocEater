@@ -24,30 +24,42 @@ logger = logging.getLogger(__name__)
 # Global lock to prevent concurrent model loading across all instances
 _global_model_lock = asyncio.Lock()
 
+# Global model instance shared across all EmbeddingService instances
+_global_model: SentenceTransformer | None = None
+
+# Global embedding service instance
+_global_embedding_service: EmbeddingService | None = None
+
 
 class EmbeddingService:
     """Jina CLIP v2 embedding service for DocEater API."""
 
     def __init__(self) -> None:
         """Initialize the embedding service."""
-        self._model: SentenceTransformer | None = None
-        self._model_lock = asyncio.Lock()
+        # Use global model instance instead of per-instance model
+        pass
 
     async def _get_model(self) -> SentenceTransformer:
         """Get or load the Jina CLIP v2 model (thread-safe)."""
-        if self._model is None:
+        global _global_model
+        if _global_model is None:
             # Use global lock to prevent racing conditions across all instances
             async with _global_model_lock:
-                if self._model is None:  # Double-check pattern
+                if _global_model is None:  # Double-check pattern
                     logger.info("Loading Jina CLIP v2 model...")
                     # Load in a thread to avoid blocking the event loop
                     loop = asyncio.get_event_loop()
-                    self._model = await loop.run_in_executor(
+                    _global_model = await loop.run_in_executor(
                         None,
                         self._load_model_simple,
                     )
                     logger.info("✅ Jina CLIP v2 model loaded successfully")
-        return self._model
+        return _global_model
+
+    @property
+    def is_model_loaded(self) -> bool:
+        """Check if the model is loaded."""
+        return _global_model is not None
 
     def _load_model_simple(self) -> SentenceTransformer:
         """Load the model with simple retry logic to handle racing conditions."""
@@ -384,3 +396,11 @@ class EmbeddingService:
         total_results = len(results["text_results"]) + len(results["image_results"])
         logger.info(f"Multimodal search returned {total_results} total results")
         return results
+
+
+def get_embedding_service() -> EmbeddingService:
+    """Get the global embedding service instance."""
+    global _global_embedding_service
+    if _global_embedding_service is None:
+        _global_embedding_service = EmbeddingService()
+    return _global_embedding_service

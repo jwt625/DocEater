@@ -8,7 +8,7 @@ from loguru import logger
 
 from ...config import get_settings
 from ...database import get_db_manager
-from ...embeddings.service import EmbeddingService
+from ...embeddings.service import get_embedding_service
 from ..auth import TokenData, get_current_user
 from ..models.requests import SearchRequest, SimilarSearchRequest
 from ..models.responses import SearchResponse, SearchResult
@@ -35,8 +35,8 @@ async def search_documents(
     logger.info(f"Search request received for query: '{request.query}'")
 
     try:
-        # Initialize embedding service
-        embedding_service = EmbeddingService()
+        # Get global embedding service
+        embedding_service = get_embedding_service()
         db_manager = get_db_manager()
 
         all_results = []
