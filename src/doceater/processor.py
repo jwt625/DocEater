@@ -136,57 +136,81 @@ class DocumentProcessor:
 
         return self.docling_wrapper.convert_to_markdown_with_storage(file_path)
 
-    async def process_file(self, file_path: Path) -> bool:
-        """Process a single file completely."""
+    async def process_file(
+        self, file_path: Path, existing_document_id: uuid.UUID | None = None
+    ) -> bool:
+        """Process a single file completely.
+
+        Args:
+            file_path: Path to the file to process
+            existing_document_id: If provided, use this existing document record instead of creating a new one
+        """
         try:
             # Validate file
             if not self.is_supported_file(file_path):
                 logger.debug(f"Skipping unsupported file: {file_path}")
                 return False
 
-            # Check if file already exists in database
-            existing_doc = await self.db_manager.get_document_by_path(str(file_path))
-            if existing_doc:
-                if existing_doc.status == DocumentStatus.COMPLETED:
-                    logger.debug(f"File already successfully processed: {file_path}")
-                    return True
-                elif existing_doc.status == DocumentStatus.PROCESSING:
-                    logger.warning(f"File is currently being processed: {file_path}")
-                    return False
-                else:
-                    # Document exists but failed or pending - allow reprocessing
-                    logger.info(
-                        f"Reprocessing {existing_doc.status} document: {file_path}"
-                    )
-                    # Delete the existing failed/pending document to start fresh
-                    await self.db_manager.delete_document(existing_doc.id)
-                    logger.debug(
-                        f"Deleted existing {existing_doc.status} document: {existing_doc.id}"
-                    )
-
-            # Calculate file hash for deduplication
-            content_hash = await self.calculate_file_hash(file_path)
-            existing_by_hash = await self.db_manager.get_document_by_hash(content_hash)
-            if existing_by_hash:
-                logger.info(f"File with same content already exists: {file_path}")
-                return True
-
-            # Create document record
+            # Get file info for all cases
             file_size = file_path.stat().st_size
             mime_type = self.get_mime_type(file_path)
 
-            document = await self.db_manager.create_document(
-                file_path=str(file_path),
-                filename=file_path.name,
-                content_hash=content_hash,
-                file_size=file_size,
-                mime_type=mime_type,
-            )
+            # If we have an existing document ID, skip duplicate checks
+            if existing_document_id:
+                logger.debug(
+                    f"Processing existing document {existing_document_id} for file: {file_path}"
+                )
+                document_id = existing_document_id
+            else:
+                # Check if file already exists in database
+                existing_doc = await self.db_manager.get_document_by_path(
+                    str(file_path)
+                )
+                if existing_doc:
+                    if existing_doc.status == DocumentStatus.COMPLETED:
+                        logger.debug(
+                            f"File already successfully processed: {file_path}"
+                        )
+                        return True
+                    elif existing_doc.status == DocumentStatus.PROCESSING:
+                        logger.warning(
+                            f"File is currently being processed: {file_path}"
+                        )
+                        return False
+                    else:
+                        # Document exists but failed or pending - allow reprocessing
+                        logger.info(
+                            f"Reprocessing {existing_doc.status} document: {file_path}"
+                        )
+                        # Delete the existing failed/pending document to start fresh
+                        await self.db_manager.delete_document(existing_doc.id)
+                        logger.debug(
+                            f"Deleted existing {existing_doc.status} document: {existing_doc.id}"
+                        )
 
-            # Update status to processing
-            await self.db_manager.update_document_status(
-                document.id, DocumentStatus.PROCESSING
-            )
+                # Calculate file hash for deduplication (only if creating new document)
+                content_hash = await self.calculate_file_hash(file_path)
+                existing_by_hash = await self.db_manager.get_document_by_hash(
+                    content_hash
+                )
+                if existing_by_hash:
+                    logger.info(f"File with same content already exists: {file_path}")
+                    return True
+
+                # Create document record
+                document = await self.db_manager.create_document(
+                    file_path=str(file_path),
+                    filename=file_path.name,
+                    content_hash=content_hash,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                )
+                document_id = document.id
+
+                # Update status to processing
+                await self.db_manager.update_document_status(
+                    document_id, DocumentStatus.PROCESSING
+                )
 
             try:
                 # Convert to markdown with optional image extraction
@@ -200,14 +224,14 @@ class DocumentProcessor:
                     if temp_image_paths:
                         try:
                             stored_images = await self.image_storage.store_images(
-                                document.id, temp_image_paths
+                                document_id, temp_image_paths
                             )
 
                             # Save image metadata to database
                             for stored_image in stored_images:
                                 try:
                                     await self.db_manager.create_document_image(
-                                        document_id=document.id,
+                                        document_id=document_id,
                                         image_path=str(stored_image.path),
                                         filename=stored_image.filename,
                                         image_type=stored_image.image_type,
@@ -226,12 +250,12 @@ class DocumentProcessor:
                                     # Continue with other images
 
                             logger.info(
-                                f"Stored {len(stored_images)} images for document {document.id}"
+                                f"Stored {len(stored_images)} images for document {document_id}"
                             )
 
                         except Exception as e:
                             logger.error(
-                                f"Failed to store images for document {document.id}: {e}"
+                                f"Failed to store images for document {document_id}: {e}"
                             )
                             # Continue processing without images
                             stored_images = []
@@ -257,7 +281,7 @@ class DocumentProcessor:
 
                 # Update document with content
                 await self.db_manager.update_document_content(
-                    document.id,
+                    document_id,
                     markdown_content,
                     DocumentStatus.COMPLETED,
                 )
@@ -265,7 +289,7 @@ class DocumentProcessor:
                 # Extract and store metadata
                 metadata = await self.extract_metadata(file_path)
                 if metadata:
-                    await self.db_manager.add_document_metadata(document.id, metadata)
+                    await self.db_manager.add_document_metadata(document_id, metadata)
 
                 # Log success with image information
                 log_details = {
@@ -283,7 +307,7 @@ class DocumentProcessor:
                 await self.db_manager.log_processing(
                     LogLevel.INFO,
                     f"Successfully processed file: {file_path.name}",
-                    document.id,
+                    document_id,
                     log_details,
                 )
 
@@ -293,15 +317,15 @@ class DocumentProcessor:
             except Exception as e:
                 # Update status to failed
                 await self.db_manager.update_document_status(
-                    document.id, DocumentStatus.FAILED
+                    document_id, DocumentStatus.FAILED
                 )
 
                 # Cleanup any partially stored images on failure
                 if self.settings.images_enabled and self.settings.images_cleanup_failed:
                     try:
-                        await self.image_storage.cleanup_document_images(document.id)
+                        await self.image_storage.cleanup_document_images(document_id)
                         logger.debug(
-                            f"Cleaned up images for failed document {document.id}"
+                            f"Cleaned up images for failed document {document_id}"
                         )
                     except Exception as cleanup_error:
                         logger.warning(
@@ -320,7 +344,7 @@ class DocumentProcessor:
                     partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
 
                     await self.db_manager.update_document_content(
-                        document.id,
+                        document_id,
                         partial_content,
                         DocumentStatus.FAILED,
                     )
@@ -337,7 +361,7 @@ class DocumentProcessor:
                 await self.db_manager.log_processing(
                     LogLevel.ERROR,
                     f"Failed to process file: {file_path.name}",
-                    document.id,
+                    document_id,
                     error_details,
                 )
 

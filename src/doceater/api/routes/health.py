@@ -11,6 +11,7 @@ from ...config import get_settings
 from ...database import get_db_manager
 from ..auth import TokenData, get_current_user, get_current_user_optional
 from ..models.responses import HealthResponse, StatsResponse
+from ..services import DocumentProcessingService
 
 router = APIRouter()
 
@@ -43,8 +44,17 @@ async def health_check(
         logger.error(f"Database health check failed: {e}")
         db_status = "unhealthy"
 
-    # Check embedding model (placeholder - will implement with embedding service)
-    model_status = "not_loaded"  # TODO: Check actual model status
+    # Check embedding model status
+    model_status = "not_loaded"
+    try:
+        processing_service = DocumentProcessingService(settings)
+        status_info = await processing_service.get_processing_status()
+        model_status = (
+            "loaded" if status_info["embedding_model_loaded"] else "not_loaded"
+        )
+    except Exception as e:
+        logger.error(f"Embedding model health check failed: {e}")
+        model_status = "error"
 
     # Check disk space (simplified)
     disk_status = "healthy"  # TODO: Implement actual disk space check
@@ -61,6 +71,8 @@ async def health_check(
         overall_status = "unhealthy"
     elif model_status == "error":
         overall_status = "degraded"
+    elif model_status == "not_loaded":
+        overall_status = "degraded"  # System is functional but not fully operational
 
     return HealthResponse(
         status=overall_status,

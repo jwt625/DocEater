@@ -23,9 +23,11 @@ from .models import (
     DocumentImage,
     DocumentMetadata,
     DocumentStatus,
+    ImageEmbedding,
     ImageType,
     LogLevel,
     ProcessingLog,
+    TextEmbedding,
 )
 
 
@@ -425,6 +427,161 @@ class DatabaseManager:
             query = query.limit(limit).offset(offset)
             result = await session.execute(query)
             return result.scalars().all()
+
+    # Embedding operations
+    async def create_text_embedding(
+        self,
+        document_id: uuid.UUID,
+        chunk_text: str,
+        embedding: list[float],
+        chunk_index: int,
+        page_number: int | None = None,
+        bbox_coordinates: dict[str, Any] | None = None,
+        token_count: int | None = None,
+    ) -> TextEmbedding:
+        """Create a new text embedding record."""
+        text_embedding = TextEmbedding(
+            document_id=document_id,
+            chunk_text=chunk_text,
+            embedding=embedding,
+            chunk_index=chunk_index,
+            page_number=page_number,
+            bbox_coordinates=bbox_coordinates,
+            token_count=token_count,
+        )
+
+        async with self.get_session() as session:
+            session.add(text_embedding)
+            await session.flush()
+            await session.refresh(text_embedding)
+
+        logger.debug(
+            f"Created text embedding: {text_embedding.id} for document {document_id}"
+        )
+        return text_embedding
+
+    async def create_image_embedding(
+        self,
+        document_image_id: uuid.UUID,
+        embedding: list[float],
+        description: str | None = None,
+        ocr_text: str | None = None,
+    ) -> ImageEmbedding:
+        """Create a new image embedding record."""
+        image_embedding = ImageEmbedding(
+            document_image_id=document_image_id,
+            embedding=embedding,
+            description=description,
+            ocr_text=ocr_text,
+        )
+
+        async with self.get_session() as session:
+            session.add(image_embedding)
+            await session.flush()
+            await session.refresh(image_embedding)
+
+        logger.debug(
+            f"Created image embedding: {image_embedding.id} for image {document_image_id}"
+        )
+        return image_embedding
+
+    async def get_text_embeddings(
+        self, document_id: uuid.UUID
+    ) -> Sequence[TextEmbedding]:
+        """Get all text embeddings for a document."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(TextEmbedding)
+                .where(TextEmbedding.document_id == document_id)
+                .order_by(TextEmbedding.chunk_index)
+            )
+            return result.scalars().all()
+
+    async def get_image_embeddings(
+        self, document_id: uuid.UUID
+    ) -> Sequence[ImageEmbedding]:
+        """Get all image embeddings for a document."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(ImageEmbedding)
+                .join(DocumentImage)
+                .where(DocumentImage.document_id == document_id)
+                .order_by(DocumentImage.image_index)
+            )
+            return result.scalars().all()
+
+    async def delete_text_embeddings(self, document_id: uuid.UUID) -> int:
+        """Delete all text embeddings for a document. Returns count of deleted embeddings."""
+        async with self.get_session() as session:
+            result = await session.execute(
+                select(TextEmbedding).where(TextEmbedding.document_id == document_id)
+            )
+            embeddings = result.scalars().all()
+            count = len(embeddings)
+
+            for embedding in embeddings:
+                await session.delete(embedding)
+
+        logger.debug(f"Deleted {count} text embeddings for document {document_id}")
+        return count
+
+    async def delete_image_embeddings(self, document_id: uuid.UUID) -> int:
+        """Delete all image embeddings for a document. Returns count of deleted embeddings."""
+        async with self.get_session() as session:
+            # Get all image embeddings for this document
+            result = await session.execute(
+                select(ImageEmbedding)
+                .join(DocumentImage)
+                .where(DocumentImage.document_id == document_id)
+            )
+            embeddings = result.scalars().all()
+            count = len(embeddings)
+
+            for embedding in embeddings:
+                await session.delete(embedding)
+
+        logger.debug(f"Deleted {count} image embeddings for document {document_id}")
+        return count
+
+    async def get_stats(self) -> dict[str, Any]:
+        """Get database statistics."""
+        async with self.get_session() as session:
+            # Count documents by status
+            total_docs_result = await session.execute(select(func.count(Document.id)))
+            total_documents = total_docs_result.scalar() or 0
+
+            processing_docs_result = await session.execute(
+                select(func.count(Document.id)).where(
+                    Document.status == DocumentStatus.PROCESSING
+                )
+            )
+            processing_documents = processing_docs_result.scalar() or 0
+
+            failed_docs_result = await session.execute(
+                select(func.count(Document.id)).where(
+                    Document.status == DocumentStatus.FAILED
+                )
+            )
+            failed_documents = failed_docs_result.scalar() or 0
+
+            # Count embeddings
+            text_embeddings_result = await session.execute(
+                select(func.count(TextEmbedding.id))
+            )
+            total_text_embeddings = text_embeddings_result.scalar() or 0
+
+            image_embeddings_result = await session.execute(
+                select(func.count(ImageEmbedding.id))
+            )
+            total_image_embeddings = image_embeddings_result.scalar() or 0
+
+            return {
+                "total_documents": total_documents,
+                "processing_documents": processing_documents,
+                "failed_documents": failed_documents,
+                "total_text_embeddings": total_text_embeddings,
+                "total_image_embeddings": total_image_embeddings,
+            }
 
 
 # Global database manager instance

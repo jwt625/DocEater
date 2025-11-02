@@ -185,3 +185,4 @@ doceater_data/
 *.sqlite3
 exported_images/*
 test_images/*
+test_pdfs/*

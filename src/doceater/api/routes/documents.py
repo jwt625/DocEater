@@ -14,6 +14,7 @@ from fastapi import (
     status,
 )
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 
 from ...config import get_settings
 from ...database import get_db_manager
@@ -23,6 +24,7 @@ from ..models.responses import (
     DocumentListResponse,
     DocumentResponse,
 )
+from ..services import DocumentProcessingService
 
 router = APIRouter()
 
@@ -129,9 +131,9 @@ async def upload_document(
         )
 
         # Start background processing
-        # TODO: Implement background task queue
-        # For now, we'll process synchronously (not recommended for production)
-        logger.info(f"Starting processing for document {document.id}")
+        processing_service = DocumentProcessingService(settings)
+        processing_service.start_background_processing(document.id, temp_file)
+        logger.info(f"Started background processing for document {document.id}")
 
         # Return document response
         response = DocumentResponse(
@@ -150,17 +152,38 @@ async def upload_document(
             metadata={},
         )
 
-        # Clean up temp file after successful processing
+        # Note: temp file cleanup is handled by the background processing service
+        # after document processing is complete
+
+        return response
+
+    except IntegrityError as e:
+        # Handle duplicate file constraint violations
         if temp_file.exists():
             try:
                 temp_file.unlink()
-                logger.debug(f"Cleaned up temporary file: {temp_file}")
+                logger.debug(
+                    f"Cleaned up temporary file after duplicate error: {temp_file}"
+                )
             except Exception as cleanup_error:
                 logger.warning(
-                    f"Failed to clean up temporary file {temp_file}: {cleanup_error}"
+                    f"Failed to clean up temporary file after duplicate error {temp_file}: {cleanup_error}"
                 )
 
-        return response
+        # Check if it's a duplicate file path constraint
+        if "ix_documents_file_path" in str(e) or "duplicate key value" in str(e):
+            logger.warning(f"Duplicate file upload attempted: {file.filename}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A document with the filename '{file.filename}' has already been uploaded. Please rename the file or check if it was already processed.",
+            )
+        else:
+            # Other integrity errors
+            logger.error(f"Database integrity error during document upload: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid document data. Please check your file and try again.",
+            )
 
     except Exception as e:
         # Clean up temp file on error
