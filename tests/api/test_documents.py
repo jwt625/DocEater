@@ -504,7 +504,162 @@ class TestDocumentDelete:
 class TestDocumentReprocess:
     """Test cases for the document reprocess endpoint."""
 
-    def test_reprocess_document_success(
+    def test_reprocess_document_existing_success(
+        self,
+        test_client: TestClient,
+        auth_headers: dict[str, str],
+        mock_db_manager: AsyncMock,
+        temp_upload_dir: Path,
+    ):
+        """Test successful document reprocessing with existing file."""
+        document_id = uuid4()
+
+        # Mock existing document
+        mock_document = MagicMock(spec=Document)
+        mock_document.id = document_id
+        mock_document.filename = "test.pdf"
+        mock_document.status = DocumentStatus.FAILED
+        mock_document.file_path = str(temp_upload_dir / "test.pdf")
+
+        # Create the file so it exists
+        test_file = temp_upload_dir / "test.pdf"
+        test_file.write_text("dummy pdf content")
+
+        mock_db_manager.get_document_by_id.return_value = mock_document
+        mock_db_manager.update_document_status.return_value = None
+        mock_db_manager.delete_text_embeddings.return_value = 0
+        mock_db_manager.delete_image_embeddings.return_value = 0
+        mock_db_manager.delete_document_images.return_value = 0
+
+        # Mock processing service
+        with patch("doceater.api.routes.documents.DocumentProcessingService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
+            mock_service.start_background_processing.return_value = None
+
+            # Make request with JSON body
+            response = test_client.post(
+                f"/api/v1/documents/{document_id}/reprocess",
+                json={"force": True, "include_text": True, "include_images": True},
+                headers=auth_headers,
+            )
+
+            # Verify response
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["message"] == "Document reprocessing started with existing file"
+            assert data["document_id"] == str(document_id)
+            assert data["filename"] == "test.pdf"
+            assert data["status"] == "pending"
+            assert data["reprocess_options"]["force"] is True
+            assert data["reprocess_options"]["include_text"] is True
+            assert data["reprocess_options"]["include_images"] is True
+
+            # Verify database calls
+            mock_db_manager.get_document_by_id.assert_called_once_with(document_id)
+            mock_db_manager.update_document_status.assert_called_once_with(document_id, DocumentStatus.PENDING)
+            mock_db_manager.delete_text_embeddings.assert_called_once_with(document_id)
+            mock_db_manager.delete_image_embeddings.assert_called_once_with(document_id)
+            mock_db_manager.delete_document_images.assert_called_once_with(document_id)
+
+            # Verify processing started
+            mock_service.start_background_processing.assert_called_once()
+            args = mock_service.start_background_processing.call_args[0]
+            assert args[0] == document_id  # document_id
+            assert str(args[1]) == str(test_file)  # existing file path
+
+    def test_reprocess_document_not_found(
+        self,
+        test_client: TestClient,
+        auth_headers: dict[str, str],
+        mock_db_manager: AsyncMock,
+    ):
+        """Test reprocessing non-existent document."""
+        document_id = uuid4()
+        mock_db_manager.get_document_by_id.return_value = None
+
+        response = test_client.post(
+            f"/api/v1/documents/{document_id}/reprocess",
+            json={},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "Document not found" in response.json()["detail"]
+
+    def test_reprocess_document_currently_processing(
+        self,
+        test_client: TestClient,
+        auth_headers: dict[str, str],
+        mock_db_manager: AsyncMock,
+    ):
+        """Test reprocessing document that is currently being processed."""
+        document_id = uuid4()
+
+        # Mock document currently processing
+        mock_document = MagicMock(spec=Document)
+        mock_document.id = document_id
+        mock_document.status = DocumentStatus.PROCESSING
+        mock_document.file_path = "/some/path/test.pdf"
+
+        mock_db_manager.get_document_by_id.return_value = mock_document
+
+        response = test_client.post(
+            f"/api/v1/documents/{document_id}/reprocess",
+            json={},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert "currently being processed" in response.json()["detail"]
+
+    def test_reprocess_document_file_missing(
+        self,
+        test_client: TestClient,
+        auth_headers: dict[str, str],
+        mock_db_manager: AsyncMock,
+    ):
+        """Test reprocessing when original file no longer exists."""
+        document_id = uuid4()
+
+        # Mock existing document with non-existent file
+        mock_document = MagicMock(spec=Document)
+        mock_document.id = document_id
+        mock_document.status = DocumentStatus.FAILED
+        mock_document.file_path = "/nonexistent/path/test.pdf"
+
+        mock_db_manager.get_document_by_id.return_value = mock_document
+
+        response = test_client.post(
+            f"/api/v1/documents/{document_id}/reprocess",
+            json={},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Original document file no longer exists" in response.json()["detail"]
+
+    def test_reprocess_document_no_write_permission(
+        self,
+        test_client: TestClient,
+        read_only_headers: dict[str, str],
+    ):
+        """Test document reprocessing with read-only permissions should fail."""
+        document_id = uuid4()
+
+        response = test_client.post(
+            f"/api/v1/documents/{document_id}/reprocess",
+            json={},
+            headers=read_only_headers,
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+class TestDocumentReprocessWithFile:
+    """Test cases for the document reprocess-with-file endpoint."""
+
+    def test_reprocess_document_with_file_success(
         self,
         test_client: TestClient,
         auth_headers: dict[str, str],
@@ -512,7 +667,7 @@ class TestDocumentReprocess:
         mock_db_manager: AsyncMock,
         temp_upload_dir: Path,
     ):
-        """Test successful document reprocessing with new PDF."""
+        """Test successful document reprocessing with new PDF file."""
         document_id = uuid4()
 
         # Mock existing document
@@ -540,7 +695,7 @@ class TestDocumentReprocess:
 
             # Make request
             response = test_client.post(
-                f"/api/v1/documents/{document_id}/reprocess",
+                f"/api/v1/documents/{document_id}/reprocess-with-file",
                 files=files,
                 headers=auth_headers,
             )
@@ -564,57 +719,7 @@ class TestDocumentReprocess:
             # Verify processing started
             mock_service.start_background_processing.assert_called_once()
 
-    def test_reprocess_document_not_found(
-        self,
-        test_client: TestClient,
-        auth_headers: dict[str, str],
-        small_test_pdf: bytes,
-        mock_db_manager: AsyncMock,
-    ):
-        """Test reprocessing non-existent document."""
-        document_id = uuid4()
-        mock_db_manager.get_document_by_id.return_value = None
-
-        files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-
-        response = test_client.post(
-            f"/api/v1/documents/{document_id}/reprocess",
-            files=files,
-            headers=auth_headers,
-        )
-
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert "Document not found" in response.json()["detail"]
-
-    def test_reprocess_document_currently_processing(
-        self,
-        test_client: TestClient,
-        auth_headers: dict[str, str],
-        small_test_pdf: bytes,
-        mock_db_manager: AsyncMock,
-    ):
-        """Test reprocessing document that is currently being processed."""
-        document_id = uuid4()
-
-        # Mock document currently processing
-        mock_document = MagicMock(spec=Document)
-        mock_document.id = document_id
-        mock_document.status = DocumentStatus.PROCESSING
-
-        mock_db_manager.get_document_by_id.return_value = mock_document
-
-        files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-
-        response = test_client.post(
-            f"/api/v1/documents/{document_id}/reprocess",
-            files=files,
-            headers=auth_headers,
-        )
-
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert "currently being processed" in response.json()["detail"]
-
-    def test_reprocess_document_invalid_file_type(
+    def test_reprocess_document_with_file_invalid_type(
         self,
         test_client: TestClient,
         auth_headers: dict[str, str],
@@ -633,29 +738,10 @@ class TestDocumentReprocess:
         files = {"file": ("test.txt", io.BytesIO(b"not a pdf"), "text/plain")}
 
         response = test_client.post(
-            f"/api/v1/documents/{document_id}/reprocess",
+            f"/api/v1/documents/{document_id}/reprocess-with-file",
             files=files,
             headers=auth_headers,
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Only PDF files are supported" in response.json()["detail"]
-
-    def test_reprocess_document_no_write_permission(
-        self,
-        test_client: TestClient,
-        read_only_headers: dict[str, str],
-        small_test_pdf: bytes,
-    ):
-        """Test document reprocessing with read-only permissions should fail."""
-        document_id = uuid4()
-
-        files = {"file": ("test.pdf", io.BytesIO(small_test_pdf), "application/pdf")}
-
-        response = test_client.post(
-            f"/api/v1/documents/{document_id}/reprocess",
-            files=files,
-            headers=read_only_headers,
-        )
-
-        assert response.status_code == status.HTTP_403_FORBIDDEN
