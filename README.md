@@ -30,7 +30,15 @@ cd DocEater
 uv sync --dev
 
 # Download models (first time only)
-uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('jinaai/jina-clip-v2', trust_remote_code=True)"
+uv run python -c "
+from sentence_transformers import SentenceTransformer
+from docling.document_converter import DocumentConverter
+print('Downloading Jina CLIP model...')
+SentenceTransformer('jinaai/jina-clip-v2', trust_remote_code=True)
+print('Downloading Docling models...')
+DocumentConverter()
+print('✅ All models downloaded')
+"
 
 # Configure environment
 cp .env.example .env
