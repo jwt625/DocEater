@@ -238,47 +238,19 @@ class DatabaseManager:
     async def delete_document(self, document_id: uuid.UUID) -> None:
         """Delete a document and all associated data."""
         async with self.get_session() as session:
-            # First delete associated images
-            await session.execute(
-                select(DocumentImage).where(DocumentImage.document_id == document_id)
-            )
-            images = (
-                (
-                    await session.execute(
-                        select(DocumentImage).where(
-                            DocumentImage.document_id == document_id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            for image in images:
-                await session.delete(image)
-
-            # Delete associated metadata
-            metadata_entries = (
-                (
-                    await session.execute(
-                        select(DocumentMetadata).where(
-                            DocumentMetadata.document_id == document_id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            for metadata in metadata_entries:
-                await session.delete(metadata)
-
-            # Delete the document itself
+            # Get the document first to check if it exists
             document = await session.get(Document, document_id)
-            if document:
-                await session.delete(document)
+            if not document:
+                logger.warning(f"Document {document_id} not found for deletion")
+                return
 
-        logger.info(f"Deleted document: {document_id}")
+            # Delete the document - this will cascade to all related records
+            # thanks to the cascade="all, delete-orphan" relationships and
+            # ondelete="CASCADE" foreign key constraints
+            await session.delete(document)
+            await session.commit()
+
+        logger.info(f"Deleted document and all associated data: {document_id}")
 
     # Metadata operations
     async def add_document_metadata(

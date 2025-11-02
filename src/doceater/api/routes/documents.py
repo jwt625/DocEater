@@ -308,7 +308,11 @@ async def get_document(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
-        # TODO: Get embedding and image counts
+        # Get actual embedding and image counts
+        text_embeddings = await db_manager.get_text_embeddings(document_id)
+        image_embeddings = await db_manager.get_image_embeddings(document_id)
+        images = await db_manager.get_document_images(document_id)
+
         return DocumentResponse(
             id=document.id,
             filename=document.filename,
@@ -319,9 +323,9 @@ async def get_document(
             updated_at=document.updated_at,
             markdown_content=document.markdown_content,
             page_count=None,
-            text_embedding_count=0,
-            image_embedding_count=0,
-            image_count=0,
+            text_embedding_count=len(text_embeddings),
+            image_embedding_count=len(image_embeddings),
+            image_count=len(images),
             metadata={},
         )
 
@@ -550,8 +554,29 @@ async def delete_document(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
             )
 
-        # TODO: Delete associated files and embeddings
+        # Clean up associated files before deleting database records
+        from doceater.image_storage import ImageStorageManager
+
+        image_storage = ImageStorageManager(settings)
+        deleted_images = await image_storage.cleanup_document_images(document_id)
+
+        # Delete the original document file if it exists
+        if document.file_path and Path(document.file_path).exists():
+            try:
+                Path(document.file_path).unlink()
+                logger.info(f"Deleted document file: {document.file_path}")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete document file {document.file_path}: {e}"
+                )
+
+        # Delete database records (this will cascade to all related records)
         await db_manager.delete_document(document_id)
+
+        logger.info(
+            f"Document {document_id} deleted by user {current_user.user_id}. "
+            f"Cleaned up {deleted_images} image files."
+        )
 
         return {"message": "Document deleted successfully"}
 

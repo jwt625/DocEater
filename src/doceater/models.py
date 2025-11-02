@@ -124,6 +124,9 @@ class Document(Base):
     text_embeddings: Mapped[list[TextEmbedding]] = relationship(
         "TextEmbedding", back_populates="document", cascade="all, delete-orphan"
     )
+    document_metadata: Mapped[list[DocumentMetadata]] = relationship(
+        "DocumentMetadata", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', status='{self.status}')>"
@@ -216,7 +219,10 @@ class DocumentMetadata(Base):
 
     # Foreign key to document
     document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Metadata key-value
