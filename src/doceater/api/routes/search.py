@@ -151,7 +151,7 @@ async def search_documents(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/search/similar", response_model=SearchResponse)
@@ -375,10 +375,10 @@ async def find_similar_documents(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid document ID: {str(e)}",
-        )
+        ) from e
     except Exception as e:
         logger.error(f"Similar search failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Similar search failed: {str(e)}",
-        )
+        ) from e

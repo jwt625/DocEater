@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import shutil
-import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import uuid
 
 from loguru import logger
 from PIL import Image

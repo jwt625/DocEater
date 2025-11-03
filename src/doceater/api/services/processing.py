@@ -8,9 +8,11 @@ to provide background document processing for uploaded files.
 from __future__ import annotations
 
 import asyncio
-import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import uuid
 
 from loguru import logger
 

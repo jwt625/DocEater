@@ -82,6 +82,13 @@ ignore = [
     "B008",  # function call in default argument (normal for FastAPI dependency injection)
 ]
 
+# Per-file ignores for imports that cannot be moved to TYPE_CHECKING
+[tool.ruff.lint.per-file-ignores]
+"src/doceater/api/services/processing.py" = ["TC003", "TC001"]  # Path and Settings used at runtime
+"src/doceater/models.py" = ["TC003"]  # datetime needed by SQLAlchemy at runtime
+"src/doceater/processor.py" = ["TC003"]  # Path used at runtime
+"tests/test_watcher.py" = ["TC003"]  # Path used at runtime in tests
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

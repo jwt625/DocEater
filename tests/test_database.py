@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 import pytest
 
-from doceater.database import DatabaseManager
+if TYPE_CHECKING:
+    from doceater.database import DatabaseManager
 from doceater.models import (
     Document,
     DocumentStatus,

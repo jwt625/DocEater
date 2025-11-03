@@ -224,7 +224,7 @@ class DoclingWrapper:
         table_counter = 0
         picture_counter = 0
 
-        for element, _level in conversion_result.document.iterate_items():
+        for element, _ in conversion_result.document.iterate_items():
             try:
                 if isinstance(element, TableItem):
                     table_counter += 1

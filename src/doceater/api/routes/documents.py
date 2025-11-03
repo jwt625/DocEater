@@ -345,7 +345,7 @@ async def get_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get document: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/documents/{document_id}/reprocess")
@@ -441,7 +441,7 @@ async def reprocess_document_existing(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reprocess document: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/documents/{document_id}/reprocess-with-file")
@@ -537,7 +537,7 @@ async def reprocess_document_with_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reprocess document: {str(e)}",
-        )
+        ) from e
 
 
 @router.delete("/documents/{document_id}")
@@ -596,4 +596,4 @@ async def delete_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}",
-        )
+        ) from e

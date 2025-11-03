@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import uuid
-from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

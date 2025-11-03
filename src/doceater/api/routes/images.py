@@ -90,4 +90,4 @@ async def get_image(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to serve image: {str(e)}",
-        )
+        ) from e

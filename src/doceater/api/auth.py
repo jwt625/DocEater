@@ -95,9 +95,11 @@ def create_jwt_token(
         "iat": now,
     }
 
-    return jwt.encode(
+    token = jwt.encode(
         payload, auth_config.jwt_secret_key, algorithm=auth_config.jwt_algorithm
     )
+    # Ensure we always return a string (PyJWT versions differ in return type)
+    return token if isinstance(token, str) else token.decode("utf-8")  # type: ignore[unreachable]
 
 
 def verify_jwt_token(token: str) -> TokenData:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import uuid
+    from collections.abc import AsyncGenerator, Sequence
 
 from loguru import logger
 from sqlalchemy import func, select, update
