@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 
-from ...config import get_settings
+from ...config import Settings, get_settings
 from ...database import get_db_manager
 from ...embeddings.service import get_embedding_service
 from ..auth import TokenData, get_current_user
@@ -20,8 +20,8 @@ router = APIRouter()
 async def search_documents(
     request: SearchRequest,
     current_user: TokenData = Depends(get_current_user),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> SearchResponse:
     """
     Perform multimodal search across documents.
 
@@ -158,8 +158,8 @@ async def search_documents(
 async def find_similar_documents(
     request: SimilarSearchRequest,
     current_user: TokenData = Depends(get_current_user),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> SearchResponse:
     """
     Find documents similar to a given document.
 

@@ -21,6 +21,9 @@ from .image_storage import ImageStorageManager
 from .models import DocumentStatus, ImageType
 from .watcher import FileWatcher
 
+# Store reference to built-in list to avoid shadowing
+builtin_list = list
+
 # Create CLI app
 app = typer.Typer(
     name="doceat",
@@ -93,7 +96,7 @@ def init(
 
         except Exception as e:
             console.print(f"❌ Failed to initialize database: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await db_manager.close()
 
@@ -106,7 +109,7 @@ def serve(
     port: int = typer.Option(8000, help="Port to bind the server to"),
     workers: int = typer.Option(1, help="Number of worker processes"),
     reload: bool = typer.Option(False, help="Enable auto-reload for development"),
-):
+) -> None:
     """Start the DocEater API server."""
     import uvicorn
 
@@ -129,7 +132,7 @@ def serve(
         console.print("\n🛑 Server stopped by user")
     except Exception as e:
         console.print(f"❌ Failed to start server: {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -173,7 +176,7 @@ def watch(
             console.print("\n🛑 Stopping file watcher...")
         except Exception as e:
             console.print(f"❌ Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await watcher.stop_watching()
             await get_db_manager().close()
@@ -194,7 +197,7 @@ def ingest(
 
         if not path.exists():
             console.print(f"❌ File not found: {path}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
         console.print(f"📄 Ingesting file: {path}")
 
@@ -207,11 +210,11 @@ def ingest(
                 console.print("✅ File ingested successfully!")
             else:
                 console.print("❌ Failed to ingest file")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
         except Exception as e:
             console.print(f"❌ Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await get_db_manager().close()
 
@@ -241,7 +244,7 @@ def list(
                     console.print(
                         "Valid statuses: pending, processing, completed, failed"
                     )
-                    raise typer.Exit(1)
+                    raise typer.Exit(1) from None
 
             # Get documents
             documents = await db_manager.list_documents(
@@ -289,7 +292,7 @@ def list(
 
         except Exception as e:
             console.print(f"❌ Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await db_manager.close()
 
@@ -311,14 +314,14 @@ def show(
                 doc_uuid = uuid.UUID(document_id)
             except ValueError:
                 console.print(f"❌ Invalid document ID: {document_id}")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
             # Get document
             document = await db_manager.get_document_by_id(doc_uuid)
 
             if not document:
                 console.print(f"❌ Document not found: {document_id}")
-                raise typer.Exit(1)
+                raise typer.Exit(1) from None
 
             # Display document details
             console.print(f"📄 Document: {document.filename}")
@@ -344,7 +347,7 @@ def show(
 
         except Exception as e:
             console.print(f"❌ Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await db_manager.close()
 
@@ -371,7 +374,7 @@ def status() -> None:
 
         except Exception as e:
             console.print(f"❌ Error: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         finally:
             await db_manager.close()
 
@@ -451,14 +454,15 @@ def images(
 
                 else:
                     # List all images with optional type filter
+                    all_images = []
                     if image_type:
                         try:
                             img_type = ImageType(image_type.lower())
-                            images = await db_manager.get_images_by_type(
-                                img_type, limit=50
+                            all_images = builtin_list(
+                                await db_manager.get_images_by_type(img_type, limit=50)
                             )
                             console.print(
-                                f"\n📷 Images of type '{image_type}': {len(images)}"
+                                f"\n📷 Images of type '{image_type}': {len(all_images)}"
                             )
                         except ValueError:
                             console.print(f"❌ Invalid image type: {image_type}")
@@ -468,23 +472,27 @@ def images(
                             raise typer.Exit(1) from None
                     else:
                         # Get recent images across all documents
-                        images = await db_manager.get_images_by_type(
-                            ImageType.PICTURE, limit=25
+                        all_images = builtin_list(
+                            await db_manager.get_images_by_type(
+                                ImageType.PICTURE, limit=25
+                            )
                         )
-                        table_images = await db_manager.get_images_by_type(
-                            ImageType.TABLE, limit=25
+                        table_images = builtin_list(
+                            await db_manager.get_images_by_type(
+                                ImageType.TABLE, limit=25
+                            )
                         )
-                        images.extend(table_images)
-                        console.print(f"\n📷 Recent images: {len(images)}")
+                        all_images.extend(table_images)
+                        console.print(f"\n📷 Recent images: {len(all_images)}")
 
-                    if images:
+                    if all_images:
                         table = Table(title="All Images")
                         table.add_column("Document ID", style="cyan")
                         table.add_column("Type", style="green")
                         table.add_column("Filename", style="blue")
                         table.add_column("Created", style="yellow")
 
-                        for image in images[:20]:  # Limit display
+                        for image in all_images[:20]:  # Limit display
                             table.add_row(
                                 str(image.document_id)[:8] + "...",
                                 image.image_type.value,

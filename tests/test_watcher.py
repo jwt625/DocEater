@@ -520,7 +520,6 @@ class TestFileWatcherIntegration:
         mock_processor = AsyncMock()
         mock_processor.process_file = AsyncMock(return_value=True)
 
-        watcher = FileWatcher(test_settings, mock_processor)
         handler = FileEventHandler(mock_processor, test_settings)
 
         test_file = temp_dir / "debounce_test.pdf"

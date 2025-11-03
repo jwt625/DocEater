@@ -7,12 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from sqlalchemy import text
 
-from ...config import get_settings
+from ...config import Settings, get_settings
 from ...database import get_db_manager
+from ...embeddings.service import get_embedding_service
 from ..auth import TokenData, get_current_user, get_current_user_optional
 from ..models.responses import HealthResponse, StatsResponse
-from ..services import DocumentProcessingService
-from ...embeddings.service import get_embedding_service
 
 router = APIRouter()
 
@@ -23,8 +22,8 @@ startup_time = time.time()
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
     current_user: TokenData | None = Depends(get_current_user_optional),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> HealthResponse:
     """
     System health check endpoint.
 
@@ -86,8 +85,9 @@ async def health_check(
 
 @router.get("/stats", response_model=StatsResponse)
 async def system_stats(
-    current_user: TokenData = Depends(get_current_user), settings=Depends(get_settings)
-):
+    current_user: TokenData = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> StatsResponse:
     """
     Get system statistics.
 

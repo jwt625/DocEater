@@ -2,13 +2,14 @@
 
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-from ..config import get_settings
+from ..config import Settings, get_settings
 
 
 class TokenData(BaseModel):
@@ -45,7 +46,7 @@ auth_config = AuthConfig()
 security = HTTPBearer(auto_error=False)
 
 
-def init_auth_config(settings) -> None:
+def init_auth_config(settings: Settings) -> None:
     """Initialize authentication configuration from settings."""
     global auth_config
 
@@ -76,7 +77,9 @@ def init_auth_config(settings) -> None:
                 auth_config.api_keys[key] = user_id
 
 
-def create_jwt_token(user_id: str, username: str, scopes: list[str] = None) -> str:
+def create_jwt_token(
+    user_id: str, username: str, scopes: list[str] | None = None
+) -> str:
     """Create a JWT token for a user."""
     if scopes is None:
         scopes = ["read", "write"]
@@ -116,13 +119,13 @@ def verify_jwt_token(token: str) -> TokenData:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
 
 
 def verify_api_key(api_key: str) -> str:
@@ -139,7 +142,7 @@ def verify_api_key(api_key: str) -> str:
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
-    settings=Depends(get_settings),
+    settings: Settings = Depends(get_settings),
 ) -> TokenData | None:
     """Get the current authenticated user."""
 
@@ -190,13 +193,13 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
 
 
 async def get_current_user_optional(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
-    settings=Depends(get_settings),
+    settings: Settings = Depends(get_settings),
 ) -> TokenData | None:
     """Get the current user, but don't require authentication."""
     try:
@@ -205,10 +208,12 @@ async def get_current_user_optional(
         return None
 
 
-def require_scope(required_scope: str):
+def require_scope(required_scope: str) -> Any:
     """Dependency to require a specific scope."""
 
-    async def check_scope(current_user: TokenData = Depends(get_current_user)):
+    async def check_scope(
+        current_user: TokenData = Depends(get_current_user),
+    ) -> TokenData:
         if required_scope not in current_user.scopes:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

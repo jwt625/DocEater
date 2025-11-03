@@ -425,7 +425,7 @@ class TestDocumentProcessor:
                             "Skipping integration test due to Docling model access issue"
                         )
                 # If it's a different error, let the test fail normally
-                assert False, (
+                raise AssertionError(
                     f"Processing failed for unknown reason. Check logs: {[log.message for log in logs]}"
                 )
 

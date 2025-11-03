@@ -1,9 +1,11 @@
 """FastAPI application for DocEater."""
 
 import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,7 +20,7 @@ startup_time = time.time()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan manager."""
     # Startup
     logger.info("🚀 Starting DocEater API server...")
@@ -93,7 +95,9 @@ def create_app() -> FastAPI:
 
     # Add request ID middleware
     @app.middleware("http")
-    async def add_request_id(request: Request, call_next):
+    async def add_request_id(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Add request ID to all requests."""
         import uuid
 
@@ -107,7 +111,9 @@ def create_app() -> FastAPI:
 
     # Add timing middleware
     @app.middleware("http")
-    async def add_timing(request: Request, call_next):
+    async def add_timing(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Add timing information to responses."""
         start_time = time.time()
         response = await call_next(request)
@@ -119,7 +125,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
-    ):
+    ) -> JSONResponse:
         """Handle validation errors."""
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -127,13 +133,15 @@ def create_app() -> FastAPI:
                 error="validation_error",
                 message="Request validation failed",
                 detail=str(exc),
-                timestamp=time.time(),
+                timestamp=datetime.now(UTC),
                 request_id=getattr(request.state, "request_id", None),
             ).model_dump(),
         )
 
     @app.exception_handler(Exception)
-    async def general_exception_handler(request: Request, exc: Exception):
+    async def general_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         """Handle general exceptions."""
         logger.exception(f"Unhandled exception in {request.method} {request.url}")
 
@@ -143,7 +151,7 @@ def create_app() -> FastAPI:
                 error="internal_server_error",
                 message="An internal server error occurred",
                 detail=str(exc) if settings.log_level == "DEBUG" else None,
-                timestamp=time.time(),
+                timestamp=datetime.now(UTC),
                 request_id=getattr(request.state, "request_id", None),
             ).model_dump(),
         )
@@ -164,7 +172,7 @@ app = create_app()
 
 
 @app.get("/", include_in_schema=False)
-async def root():
+async def root() -> dict[str, str]:
     """Root endpoint redirect to docs."""
     return {"message": "DocEater API", "docs": "/docs", "health": "/api/v1/health"}
 

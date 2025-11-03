@@ -19,17 +19,17 @@ class Base(DeclarativeBase):
     pass
 
 
-class Vector(UserDefinedType):
+class Vector(UserDefinedType[list[float]]):
     """Custom SQLAlchemy type for PostgreSQL vector columns."""
 
-    def __init__(self, dimension: int = 1024):
+    def __init__(self, dimension: int = 1024) -> None:
         self.dimension = dimension
 
-    def get_col_spec(self):
+    def get_col_spec(self, **kw: Any) -> str:
         return f"vector({self.dimension})"
 
-    def bind_processor(self, dialect):
-        def process(value):
+    def bind_processor(self, dialect: Any) -> Any:
+        def process(value: Any) -> Any:
             if value is None:
                 return None
             # Convert list of floats to PostgreSQL vector format
@@ -39,8 +39,8 @@ class Vector(UserDefinedType):
 
         return process
 
-    def result_processor(self, dialect, coltype):
-        def process(value):
+    def result_processor(self, dialect: Any, coltype: Any) -> Any:
+        def process(value: Any) -> Any:
             if value is None:
                 return None
             # Convert PostgreSQL vector format back to list of floats

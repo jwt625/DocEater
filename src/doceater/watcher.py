@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
+
+if TYPE_CHECKING:
+    from watchdog.observers.api import BaseObserver
 
 from .config import Settings, get_settings
 from .processor import DocumentProcessor
@@ -27,17 +31,17 @@ class FileEventHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         """Handle file creation events."""
         if not event.is_directory:
-            self._queue_file_for_processing(Path(event.src_path))
+            self._queue_file_for_processing(Path(str(event.src_path)))
 
     def on_modified(self, event: FileSystemEvent) -> None:
         """Handle file modification events."""
         if not event.is_directory:
-            self._queue_file_for_processing(Path(event.src_path))
+            self._queue_file_for_processing(Path(str(event.src_path)))
 
     def on_moved(self, event: FileSystemEvent) -> None:
         """Handle file move events."""
         if not event.is_directory and hasattr(event, "dest_path"):
-            self._queue_file_for_processing(Path(event.dest_path))
+            self._queue_file_for_processing(Path(str(event.dest_path)))
 
     def _queue_file_for_processing(self, file_path: Path) -> None:
         """Queue a file for processing with debouncing."""
@@ -71,7 +75,7 @@ class FileWatcher:
     ) -> None:
         self.settings = settings or get_settings()
         self.processor = processor or DocumentProcessor(self.settings)
-        self.observer: Observer | None = None
+        self.observer: BaseObserver | None = None
         self.event_handler: FileEventHandler | None = None
         self._processing_tasks: set[asyncio.Task[Any]] = set()
         self._queue_task: asyncio.Task[None] | None = None
@@ -128,10 +132,8 @@ class FileWatcher:
         # Cancel the queue processing task
         if self._queue_task and not self._queue_task.done():
             self._queue_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._queue_task
-            except asyncio.CancelledError:
-                pass
             self._queue_task = None
 
         # Cancel all processing tasks
@@ -202,12 +204,9 @@ class FileWatcher:
         logger.info(f"Processing existing files in: {watch_path}")
 
         # Find all supported files
-        files_to_process = []
+        files_to_process: list[Path] = []
         for ext in self.settings.supported_extensions:
-            if self.settings.watch_recursive:
-                pattern = f"**/*{ext}"
-            else:
-                pattern = f"*{ext}"
+            pattern = f"**/*{ext}" if self.settings.watch_recursive else f"*{ext}"
 
             files_to_process.extend(watch_path.glob(pattern))
 

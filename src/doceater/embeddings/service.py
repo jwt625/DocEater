@@ -377,7 +377,11 @@ class EmbeddingService:
         include_images: bool = True,
     ) -> dict[str, Any]:
         """Search both text and images, returning combined results."""
-        results = {"text_results": [], "image_results": [], "query": query}
+        results: dict[str, Any] = {
+            "text_results": [],
+            "image_results": [],
+            "query": query,
+        }
 
         # Search text if requested
         if include_text:
@@ -391,7 +395,7 @@ class EmbeddingService:
             image_results = await self.search_similar_images(
                 session, query, top_k, similarity_threshold
             )
-            results["image_results"] = list(image_results)
+            results["image_results"] = image_results
 
         total_results = len(results["text_results"]) + len(results["image_results"])
         logger.info(f"Multimodal search returned {total_results} total results")

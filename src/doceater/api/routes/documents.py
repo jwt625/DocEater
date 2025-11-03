@@ -1,6 +1,7 @@
 """Document management endpoints."""
 
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from fastapi import (
@@ -17,7 +18,7 @@ from fastapi import (
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
-from ...config import get_settings
+from ...config import Settings, get_settings
 from ...database import get_db_manager
 from ...models import Document, DocumentStatus
 from ..auth import TokenData, get_current_user, require_write
@@ -73,7 +74,7 @@ async def save_upload_file(upload_file: UploadFile, temp_dir: Path) -> Path:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save uploaded file: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/documents/upload", response_model=DocumentResponse)
@@ -81,8 +82,8 @@ async def upload_document(
     file: UploadFile = File(..., description="PDF file to upload"),
     description: str | None = Form(None, description="Document description"),
     current_user: TokenData = Depends(require_write),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> DocumentResponse:
     """
     Upload and process a PDF document.
 
@@ -113,7 +114,7 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save uploaded file: {str(e)}",
-        )
+        ) from e
 
     try:
         # Create document record
@@ -182,14 +183,14 @@ async def upload_document(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"A document with the filename '{file.filename}' has already been uploaded. Please rename the file or check if it was already processed.",
-            )
+            ) from e
         else:
             # Other integrity errors
             logger.error(f"Database integrity error during document upload: {e}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid document data. Please check your file and try again.",
-            )
+            ) from e
 
     except Exception as e:
         # Clean up temp file on error
@@ -205,7 +206,7 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process document: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/documents", response_model=DocumentListResponse)
@@ -214,8 +215,8 @@ async def list_documents(
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     status_filter: DocumentStatus | None = Query(None, description="Filter by status"),
     current_user: TokenData = Depends(get_current_user),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> DocumentListResponse:
     """
     List documents with pagination and filtering.
 
@@ -291,15 +292,15 @@ async def list_documents(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list documents: {str(e)}",
-        )
+        ) from e
 
 
 @router.get("/documents/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: UUID,
     current_user: TokenData = Depends(get_current_user),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> DocumentResponse:
     """
     Get document details by ID.
 
@@ -352,8 +353,8 @@ async def reprocess_document_existing(
     document_id: UUID,
     request: ReprocessRequest = Body(default_factory=ReprocessRequest),
     current_user: TokenData = Depends(require_write),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
     """
     Reprocess an existing document without uploading a new file.
 
@@ -448,8 +449,8 @@ async def reprocess_document_with_file(
     document_id: UUID,
     file: UploadFile = File(..., description="New PDF file to reprocess"),
     current_user: TokenData = Depends(require_write),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
     """
     Reprocess a document with a new PDF file.
 
@@ -543,8 +544,8 @@ async def reprocess_document_with_file(
 async def delete_document(
     document_id: UUID,
     current_user: TokenData = Depends(require_write),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
     """
     Delete a document and all associated data.
 

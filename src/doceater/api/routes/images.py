@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from loguru import logger
 
-from ...config import get_settings
+from ...config import Settings, get_settings
 from ...database import get_db_manager
 from ...image_storage import ImageStorageManager
 from ...models import DocumentImage
@@ -19,8 +19,8 @@ router = APIRouter()
 async def get_image(
     image_id: UUID,
     current_user: TokenData = Depends(get_current_user),
-    settings=Depends(get_settings),
-):
+    settings: Settings = Depends(get_settings),
+) -> FileResponse:
     """
     Serve an extracted image by ID.
 

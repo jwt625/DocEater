@@ -194,7 +194,7 @@ class Settings(BaseSettings):
         try:
             path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            raise ValueError(f"Cannot create images directory {path}: {e}")
+            raise ValueError(f"Cannot create images directory {path}: {e}") from e
 
         if not path.is_dir():
             raise ValueError(f"Images base path must be a directory: {path}")

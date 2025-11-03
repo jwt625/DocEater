@@ -17,14 +17,14 @@ from doceater.models import (
 class TestDocumentStatus:
     """Test DocumentStatus enum."""
 
-    def test_status_values(self):
+    def test_status_values(self) -> None:
         """Test that status enum has correct values."""
-        assert DocumentStatus.PENDING == "pending"
-        assert DocumentStatus.PROCESSING == "processing"
-        assert DocumentStatus.COMPLETED == "completed"
-        assert DocumentStatus.FAILED == "failed"
+        assert DocumentStatus.PENDING.value == "pending"
+        assert DocumentStatus.PROCESSING.value == "processing"
+        assert DocumentStatus.COMPLETED.value == "completed"
+        assert DocumentStatus.FAILED.value == "failed"
 
-    def test_status_iteration(self):
+    def test_status_iteration(self) -> None:
         """Test that we can iterate over all statuses."""
         statuses = list(DocumentStatus)
         assert len(statuses) == 4
@@ -37,13 +37,13 @@ class TestDocumentStatus:
 class TestLogLevel:
     """Test LogLevel enum."""
 
-    def test_log_level_values(self):
+    def test_log_level_values(self) -> None:
         """Test that log level enum has correct values."""
-        assert LogLevel.INFO == "info"
-        assert LogLevel.WARNING == "warning"
-        assert LogLevel.ERROR == "error"
+        assert LogLevel.INFO.value == "info"
+        assert LogLevel.WARNING.value == "warning"
+        assert LogLevel.ERROR.value == "error"
 
-    def test_log_level_iteration(self):
+    def test_log_level_iteration(self) -> None:
         """Test that we can iterate over all log levels."""
         levels = list(LogLevel)
         assert len(levels) == 3
@@ -55,7 +55,7 @@ class TestLogLevel:
 class TestDocument:
     """Test Document model."""
 
-    def test_document_table_structure(self):
+    def test_document_table_structure(self) -> None:
         """Test Document table structure and column definitions."""
         # Test table name
         assert Document.__tablename__ == "documents"
@@ -73,7 +73,7 @@ class TestDocument:
         assert "created_at" in columns
         assert "updated_at" in columns
 
-    def test_document_creation_with_values(self):
+    def test_document_creation_with_values(self) -> None:
         """Test creating a Document instance with explicit values."""
         doc_id = uuid.uuid4()
         now = datetime.now()
@@ -101,7 +101,7 @@ class TestDocument:
         assert doc.created_at == now
         assert doc.updated_at == now
 
-    def test_document_repr(self):
+    def test_document_repr(self) -> None:
         """Test Document string representation."""
         doc = Document()
         doc.filename = "document.pdf"
@@ -114,7 +114,7 @@ class TestDocument:
 class TestDocumentMetadata:
     """Test DocumentMetadata model."""
 
-    def test_metadata_table_structure(self):
+    def test_metadata_table_structure(self) -> None:
         """Test DocumentMetadata table structure."""
         assert DocumentMetadata.__tablename__ == "document_metadata"
 
@@ -125,7 +125,7 @@ class TestDocumentMetadata:
         assert "value" in columns
         assert "created_at" in columns
 
-    def test_metadata_creation_with_values(self):
+    def test_metadata_creation_with_values(self) -> None:
         """Test creating a DocumentMetadata instance with explicit values."""
         doc_id = uuid.uuid4()
         metadata_id = uuid.uuid4()
@@ -144,7 +144,7 @@ class TestDocumentMetadata:
         assert metadata.value == "John Doe"
         assert metadata.created_at == now
 
-    def test_metadata_null_value(self):
+    def test_metadata_null_value(self) -> None:
         """Test DocumentMetadata with null value."""
         doc_id = uuid.uuid4()
 
@@ -156,7 +156,7 @@ class TestDocumentMetadata:
         assert metadata.key == "description"
         assert metadata.value is None
 
-    def test_metadata_repr(self):
+    def test_metadata_repr(self) -> None:
         """Test DocumentMetadata string representation."""
         doc_id = uuid.uuid4()
 
@@ -173,7 +173,7 @@ class TestDocumentMetadata:
 class TestProcessingLog:
     """Test ProcessingLog model."""
 
-    def test_log_table_structure(self):
+    def test_log_table_structure(self) -> None:
         """Test ProcessingLog table structure."""
         assert ProcessingLog.__tablename__ == "processing_logs"
 
@@ -185,7 +185,7 @@ class TestProcessingLog:
         assert "details" in columns
         assert "created_at" in columns
 
-    def test_log_creation_with_values(self):
+    def test_log_creation_with_values(self) -> None:
         """Test creating a ProcessingLog instance with explicit values."""
         doc_id = uuid.uuid4()
         log_id = uuid.uuid4()
@@ -206,7 +206,7 @@ class TestProcessingLog:
         assert log.details == {"file_size": 1024}
         assert log.created_at == now
 
-    def test_log_system_message(self):
+    def test_log_system_message(self) -> None:
         """Test ProcessingLog for system messages (no document_id)."""
         log = ProcessingLog()
         log.document_id = None
@@ -219,7 +219,7 @@ class TestProcessingLog:
         assert log.message == "System warning"
         assert log.details == {"component": "watcher"}
 
-    def test_log_repr(self):
+    def test_log_repr(self) -> None:
         """Test ProcessingLog string representation."""
         doc_id = uuid.uuid4()
 

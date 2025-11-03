@@ -8,7 +8,13 @@ from typing import Any
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling_core.types.doc import ImageRefMode, PictureItem, TableItem
+
+# Import from docling_core - mypy has issues with these exports but they work at runtime
+from docling_core.types.doc.document import (  # type: ignore[attr-defined]
+    ImageRefMode,
+    PictureItem,
+    TableItem,
+)
 from loguru import logger
 
 # Global converter instance to avoid reloading models on every request
@@ -114,7 +120,8 @@ class DoclingWrapper:
             Markdown content as string
         """
         result = self.convert_document(file_path)
-        return result.document.export_to_markdown()
+        markdown_content: str = result.document.export_to_markdown()
+        return markdown_content
 
     def convert_to_markdown_with_storage(
         self,
@@ -179,7 +186,7 @@ class DoclingWrapper:
         Returns:
             Dictionary with image metadata including counts by type
         """
-        metadata = {
+        metadata: dict[str, Any] = {
             "total_images": 0,
             "table_count": 0,
             "picture_count": 0,
@@ -224,20 +231,32 @@ class DoclingWrapper:
                     element_image_filename = (
                         output_dir / f"{doc_filename}-table-{table_counter}.png"
                     )
-                    with element_image_filename.open("wb") as fp:
-                        element.get_image(conversion_result.document).save(fp, "PNG")
-                    extracted_images.append(element_image_filename)
-                    logger.debug(f"Saved table image: {element_image_filename}")
+                    image = element.get_image(conversion_result.document)
+                    if image is not None:
+                        with element_image_filename.open("wb") as fp:
+                            image.save(fp, "PNG")
+                        extracted_images.append(element_image_filename)
+                        logger.debug(f"Saved table image: {element_image_filename}")
+                    else:
+                        logger.warning(
+                            f"No image data available for table {table_counter}"
+                        )
 
                 elif isinstance(element, PictureItem):
                     picture_counter += 1
                     element_image_filename = (
                         output_dir / f"{doc_filename}-picture-{picture_counter}.png"
                     )
-                    with element_image_filename.open("wb") as fp:
-                        element.get_image(conversion_result.document).save(fp, "PNG")
-                    extracted_images.append(element_image_filename)
-                    logger.debug(f"Saved picture image: {element_image_filename}")
+                    image = element.get_image(conversion_result.document)
+                    if image is not None:
+                        with element_image_filename.open("wb") as fp:
+                            image.save(fp, "PNG")
+                        extracted_images.append(element_image_filename)
+                        logger.debug(f"Saved picture image: {element_image_filename}")
+                    else:
+                        logger.warning(
+                            f"No image data available for picture {picture_counter}"
+                        )
 
             except Exception as e:
                 logger.warning(f"Failed to extract image from element: {e}")

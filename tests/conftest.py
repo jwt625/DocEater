@@ -13,8 +13,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from doceater.config import Settings
 from doceater.database import DatabaseManager
@@ -97,11 +101,11 @@ async def clean_database(test_engine: AsyncEngine) -> AsyncGenerator[None]:
 
 @pytest_asyncio.fixture
 async def test_session(
-    test_engine: AsyncEngine, clean_database
+    test_engine: AsyncEngine, clean_database: Any
 ) -> AsyncGenerator[AsyncSession]:
     """Create a test database session."""
-    async_session = sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False
+    async_session = async_sessionmaker(
+        test_engine, expire_on_commit=False
     )
 
     async with async_session() as session:
@@ -110,7 +114,7 @@ async def test_session(
 
 @pytest_asyncio.fixture
 async def test_db_manager(
-    test_settings: Settings, test_engine: AsyncEngine, clean_database
+    test_settings: Settings, test_engine: AsyncEngine, clean_database: Any
 ) -> AsyncGenerator[DatabaseManager]:
     """Create a test database manager."""
     db_manager = DatabaseManager(test_settings)
@@ -176,7 +180,7 @@ def sample_document_id() -> uuid.UUID:
 
 
 @pytest.fixture
-def create_test_file():
+def create_test_file() -> Any:
     """Factory fixture to create test files."""
 
     def _create_file(directory: Path, filename: str, content: bytes | str) -> Path:
@@ -224,10 +228,10 @@ class AsyncMockContext:
     def __init__(self, return_value: Any = None):
         self.return_value = return_value
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
         return self.return_value
 
-    async def __aexit__(self, *_):
+    async def __aexit__(self, *_: Any) -> None:
         return None
 
 

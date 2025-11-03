@@ -5,6 +5,10 @@ from __future__ import annotations
 import hashlib
 import mimetypes
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import uuid
 
 import aiofiles
 from loguru import logger
@@ -12,7 +16,7 @@ from loguru import logger
 from .config import Settings, get_settings
 from .database import DatabaseManager, get_db_manager
 from .docling_wrapper import DoclingWrapper, get_docling_wrapper
-from .image_storage import ImageStorageManager
+from .image_storage import ImageStorageManager, StoredImage
 from .models import DocumentStatus, LogLevel
 
 
@@ -141,8 +145,8 @@ class DocumentProcessor:
             existing_document_id: If provided, use this existing document record instead of creating a new one
         """
         # Initialize variables that might be used in exception handler
-        file_size = None
-        mime_type = None
+        file_size: int | None = None
+        mime_type: str | None = None
 
         try:
             # Validate file
@@ -212,6 +216,9 @@ class DocumentProcessor:
                 )
 
             try:
+                # Initialize stored_images for type checking
+                stored_images: list[StoredImage] = []
+
                 # Convert to markdown with optional image extraction
                 if self.settings.images_enabled:
                     (
@@ -291,13 +298,13 @@ class DocumentProcessor:
                     await self.db_manager.add_document_metadata(document_id, metadata)
 
                 # Log success with image information
-                log_details = {
+                log_details: dict[str, Any] = {
                     "file_size": file_size,
                     "content_length": len(markdown_content),
                     "images_enabled": self.settings.images_enabled,
                 }
 
-                if "stored_images" in locals():
+                if stored_images:
                     log_details["images_extracted"] = len(stored_images)
                     log_details["image_types"] = [
                         img.image_type.value for img in stored_images
@@ -332,7 +339,10 @@ class DocumentProcessor:
                         )
 
                 # Log error with partial content recovery attempt
-                error_details = {"error": str(e), "error_type": type(e).__name__}
+                error_details: dict[str, Any] = {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
 
                 # Try to extract partial content
                 try:
@@ -341,11 +351,8 @@ class DocumentProcessor:
                         f"# {file_path.name}\n\n*File processing failed: {e}*\n\n"
                     )
 
-                    # Add file information if available
-                    if file_size is not None:
-                        partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
-                    else:
-                        partial_content += f"File information:\n- Path: {file_path}\n- Error occurred during initial file processing\n"
+                    # Add file information
+                    partial_content += f"File information:\n- Size: {file_size} bytes\n- Type: {mime_type or 'unknown'}\n"
 
                     await self.db_manager.update_document_content(
                         document_id,

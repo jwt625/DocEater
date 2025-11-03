@@ -30,7 +30,7 @@ class DocumentProcessingService:
         self.db_manager = DatabaseManager(settings)
         self.document_processor = DocumentProcessor(settings)
         self.embedding_service = get_embedding_service()
-        self._processing_tasks: set[asyncio.Task] = set()
+        self._processing_tasks: set[asyncio.Task[None]] = set()
 
     async def process_document_async(
         self, document_id: uuid.UUID, file_path: Path

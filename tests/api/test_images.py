@@ -103,7 +103,6 @@ class TestImageServing:
     ):
         """Test serving image when database record exists but file is missing."""
         image_id = uuid4()
-        missing_file_path = "/nonexistent/path/image.png"
 
         with patch("doceater.api.routes.images.get_db_manager") as mock_get_db:
             mock_db_manager = AsyncMock()
@@ -168,8 +167,8 @@ class TestImageServing:
 
                 # Mock session and image record
                 mock_session = AsyncMock()
-                mock_db_manager.get_session = lambda: AsyncContextManagerMock(
-                    return_value=mock_session
+                mock_db_manager.get_session = lambda session=mock_session: AsyncContextManagerMock(
+                    return_value=session
                 )
 
                 mock_image = MagicMock(spec=DocumentImage)

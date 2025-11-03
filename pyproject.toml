@@ -77,7 +77,10 @@ select = [
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
 ]
-ignore = ["E501"]  # line too long (handled by formatter)
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # function call in default argument (normal for FastAPI dependency injection)
+]
 
 [tool.ruff.format]
 quote-style = "double"
