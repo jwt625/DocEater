@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     import uuid
 
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 
 from doceater.config import Settings
 from doceater.database import DatabaseManager
@@ -112,7 +113,13 @@ class DocumentProcessingService:
         try:
             # Get the document to access its content
             document = await self.db_manager.get_document_by_id(document_id)
-            if not document or not document.markdown_content:
+            if not document:
+                logger.warning(
+                    f"Document {document_id} not found - may have been deleted"
+                )
+                return
+
+            if not document.markdown_content:
                 logger.warning(f"No content found for document {document_id}")
                 return
 
@@ -146,20 +153,46 @@ class DocumentProcessingService:
             for i, (chunk, embedding) in enumerate(
                 zip(chunks, embeddings, strict=False)
             ):
-                await self.db_manager.create_text_embedding(
-                    document_id=document_id,
-                    chunk_text=chunk,
-                    embedding=embedding,
-                    chunk_index=i,
-                    page_number=None,  # TODO: Extract page info from content
-                    bbox_coordinates=None,
-                    token_count=len(chunk.split()),  # Simple token count
-                )
+                try:
+                    await self.db_manager.create_text_embedding(
+                        document_id=document_id,
+                        chunk_text=chunk,
+                        embedding=embedding,
+                        chunk_index=i,
+                        page_number=None,  # TODO: Extract page info from content
+                        bbox_coordinates=None,
+                        token_count=len(chunk.split()),  # Simple token count
+                    )
+                except IntegrityError as db_error:
+                    # Handle foreign key constraint violations (document deleted during processing)
+                    if "text_embeddings_document_id_fkey" in str(db_error):
+                        logger.warning(
+                            f"Document {document_id} was deleted during embedding generation - stopping"
+                        )
+                        return
+                    else:
+                        # Re-raise other integrity errors
+                        raise
+                except Exception:
+                    # Handle other database errors
+                    raise
 
             logger.info(
                 f"Generated {len(embeddings)} text embeddings for document {document_id}"
             )
 
+        except IntegrityError as e:
+            # Handle foreign key constraint violations at the top level too
+            if "text_embeddings_document_id_fkey" in str(e):
+                logger.warning(
+                    f"Document {document_id} was deleted during embedding generation"
+                )
+                return
+            else:
+                logger.error(
+                    f"Integrity error generating text embeddings for document {document_id}: {e}"
+                )
+                raise
         except Exception as e:
             logger.error(
                 f"Error generating text embeddings for document {document_id}: {e}"
@@ -214,17 +247,33 @@ class DocumentProcessingService:
 
             # Store embeddings in database
             for image_record, embedding in zip(image_records, embeddings, strict=False):
-                await self.db_manager.create_image_embedding(
-                    document_image_id=image_record.id,
-                    embedding=embedding,
-                    description=None,  # TODO: Generate image descriptions
-                    ocr_text=None,  # TODO: Extract OCR text
-                )
+                try:
+                    await self.db_manager.create_image_embedding(
+                        document_image_id=image_record.id,
+                        embedding=embedding,
+                        description=None,  # TODO: Generate image descriptions
+                        ocr_text=None,  # TODO: Extract OCR text
+                    )
+                except IntegrityError:
+                    # Handle foreign key constraint violations (document deleted during processing)
+                    logger.warning(
+                        f"Document {document_id} was deleted during image embedding generation - stopping"
+                    )
+                    return
+                except Exception:
+                    # Handle other database errors
+                    raise
 
             logger.info(
                 f"Generated {len(embeddings)} image embeddings for document {document_id}"
             )
 
+        except IntegrityError:
+            # Handle foreign key constraint violations at the top level too
+            logger.warning(
+                f"Document {document_id} was deleted during image embedding generation"
+            )
+            return
         except Exception as e:
             logger.error(
                 f"Error generating image embeddings for document {document_id}: {e}"
