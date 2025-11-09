@@ -2,6 +2,9 @@
 """
 Process PDFs and upload to DocEater with progress tracking.
 
+Requirements:
+    pip install python-dotenv requests
+
 Usage:
     ./process_pdfs.py --test --limit 5           # Test with 5 files
     ./process_pdfs.py --batch tiny               # Process tiny files only
@@ -20,9 +23,42 @@ import requests
 from pathlib import Path
 from datetime import datetime
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("❌ Error: python-dotenv is not installed")
+    print("   Install it with: pip install python-dotenv")
+    sys.exit(1)
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / '.env'
+if not env_path.exists():
+    print(f"❌ Error: .env file not found at {env_path}")
+    sys.exit(1)
+
+load_dotenv(env_path)
+
+# Get API key from environment
+api_keys_str = os.getenv('DOCEATER_API_KEYS')
+if not api_keys_str:
+    print("❌ Error: DOCEATER_API_KEYS not found in .env file")
+    sys.exit(1)
+
+# Parse API keys and get admin key
+# Format: dk_prod_xxx:role,dk_read_yyy:role
+API_KEY = None
+for key_pair in api_keys_str.split(','):
+    key, role = key_pair.split(':')
+    if 'admin' in role.lower():
+        API_KEY = key
+        break
+
+if not API_KEY:
+    print("❌ Error: No admin API key found in .env file")
+    sys.exit(1)
+
 # Configuration
 DOCLING_API_URL = "http://192.222.54.152:8000"
-API_KEY = "dk_prod_8f2a9b4c6d1e3f5a7b9c2d4e6f8a1b3c5d7e9f2a4b6c8d1e"  # Admin key
 INVENTORY_FILE = "pdf_inventory.csv"
 EXCLUSION_FILE_MY = "pdf_exclusion_list.txt"
 EXCLUSION_FILE_GEMINI = "pdf_exclusion_list_gemini.txt"
@@ -106,6 +142,94 @@ def log_error(filepath, error_msg):
         f.write(f"  Error: {error_msg}\n\n")
 
 
+def validate_server():
+    """Validate server is running and accessible."""
+    try:
+        response = requests.get(f"{DOCLING_API_URL}/api/v1/health", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            uptime = data.get('uptime_days', 'unknown')
+            return True, f"Server is healthy (uptime: {uptime} days)"
+        else:
+            return False, f"Server returned status {response.status_code}"
+    except Exception as e:
+        return False, f"Cannot connect to server: {str(e)}"
+
+
+def get_server_documents():
+    """Get list of all documents from server."""
+    try:
+        headers = {'X-API-Key': API_KEY}
+        response = requests.get(
+            f"{DOCLING_API_URL}/api/v1/documents",
+            headers=headers,
+            timeout=30
+        )
+        if response.status_code == 200:
+            docs = response.json()
+            # API returns list directly, not wrapped in 'documents' key
+            if isinstance(docs, list):
+                return docs
+            return docs.get('documents', [])
+        else:
+            print(f"⚠️  Failed to get server documents: HTTP {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"⚠️  Failed to get server documents: {str(e)}")
+        return []
+
+
+def validate_progress_with_server(progress):
+    """Validate local progress tracking against server state."""
+    print("\n" + "="*80)
+    print("VALIDATING PROGRESS WITH SERVER")
+    print("="*80)
+
+    # Get server documents
+    server_docs = get_server_documents()
+    if not server_docs:
+        print("⚠️  Could not retrieve server documents for validation")
+        print("="*80 + "\n")
+        return
+
+    # Extract filenames from server
+    server_filenames = set()
+    for doc in server_docs:
+        filename = doc.get('filename', '')
+        if filename:
+            server_filenames.add(filename)
+
+    print(f"📊 Server has {len(server_filenames)} documents")
+    print(f"📊 Local progress shows {len(progress.get('processed', []))} processed")
+    print()
+
+    # Check for discrepancies
+    local_processed = progress.get('processed', [])
+    local_filenames = {os.path.basename(path) for path in local_processed}
+
+    # Files in local progress but not on server
+    missing_on_server = local_filenames - server_filenames
+    if missing_on_server:
+        print(f"⚠️  {len(missing_on_server)} files in local progress but NOT on server:")
+        for filename in list(missing_on_server)[:10]:
+            print(f"   - {filename}")
+        if len(missing_on_server) > 10:
+            print(f"   ... and {len(missing_on_server) - 10} more")
+        print()
+
+    # Files on server but not in local progress
+    extra_on_server = server_filenames - local_filenames
+    if extra_on_server:
+        print(f"ℹ️  {len(extra_on_server)} files on server but NOT in local progress")
+        print(f"   (These may have been uploaded manually or from another session)")
+        print()
+
+    if not missing_on_server and not extra_on_server:
+        print("✅ Local progress matches server state perfectly!")
+
+    print("="*80 + "\n")
+
+
 def upload_pdf(filepath, progress):
     """Upload a single PDF to DocEater."""
     try:
@@ -113,18 +237,18 @@ def upload_pdf(filepath, progress):
         if filepath in progress['processed']:
             print(f"  ⏭️  Already processed, skipping")
             return 'skipped'
-        
+
         # Prepare file
         filename = os.path.basename(filepath)
-        
+
         # Upload to DocEater
         with open(filepath, 'rb') as f:
             files = {'file': (filename, f, 'application/pdf')}
             headers = {'X-API-Key': API_KEY}
-            
+
             start_time = time.time()
             response = requests.post(
-                f"{DOCLING_API_URL}/documents/upload",
+                f"{DOCLING_API_URL}/api/v1/documents/upload",
                 files=files,
                 headers=headers,
                 timeout=300  # 5 minute timeout
@@ -155,34 +279,38 @@ def upload_pdf(filepath, progress):
         return 'failed'
 
 
-def filter_files(inventory, exclusions, args):
+def filter_files(inventory, exclusions, args, progress=None):
     """Filter files based on command line arguments."""
     files_to_process = []
-    
+
     for item in inventory:
         filepath = item['full_path']
-        
+
         # Skip excluded files
         if filepath in exclusions:
             continue
-        
+
+        # Skip already processed files if resuming
+        if args.resume and progress and filepath in progress.get('processed', []):
+            continue
+
         # Filter by risk level
         if args.risk_level and item['risk_level'] != args.risk_level:
             continue
-        
+
         # Filter by batch size
         if args.batch:
             size_mb = float(item['size_mb'])
             min_size, max_size = SIZE_CATEGORIES[args.batch]
             if not (min_size <= size_mb < max_size):
                 continue
-        
+
         files_to_process.append(item)
-    
+
     # Limit if specified
     if args.limit:
         files_to_process = files_to_process[:args.limit]
-    
+
     return files_to_process
 
 
@@ -245,21 +373,63 @@ def main():
                        help='Process specific risk level only')
     parser.add_argument('--all', action='store_true', help='Process all files (respecting exclusions)')
     parser.add_argument('--resume', action='store_true', help='Resume from previous run')
-    
+    parser.add_argument('--validate', action='store_true', help='Validate progress with server and exit')
+    parser.add_argument('--check-server', action='store_true', help='Check server health and exit')
+
     args = parser.parse_args()
+
+    # Check server health if requested
+    if args.check_server:
+        print("Checking server health...")
+        is_healthy, msg = validate_server()
+        if is_healthy:
+            print(f"✅ {msg}")
+
+            # Also show server stats
+            docs = get_server_documents()
+            if docs:
+                total_size = sum(doc.get('size_bytes', 0) for doc in docs) / (1024*1024)
+                print(f"📊 Server has {len(docs)} documents ({total_size:.2f} MB)")
+        else:
+            print(f"❌ {msg}")
+        return
+
+    # Validate progress if requested
+    if args.validate:
+        progress = load_progress()
+        validate_progress_with_server(progress)
+        return
     
     # Load data
     print("Loading inventory and exclusions...")
     inventory = load_inventory()
     exclusions = load_exclusions()
     progress = load_progress()
-    
+
+    # Validate server is accessible (unless in test mode)
+    if not args.test:
+        print("\nChecking server health...")
+        is_healthy, msg = validate_server()
+        if not is_healthy:
+            print(f"❌ {msg}")
+            print("⚠️  Cannot proceed. Please start the DocEater server first.")
+            return
+        print(f"✅ {msg}\n")
+
+    # Show resume info if applicable
+    if args.resume and progress.get('processed'):
+        print(f"📋 Resuming from previous run:")
+        print(f"   Already processed: {len(progress['processed'])} files")
+        print(f"   Failed: {len(progress.get('failed', []))} files")
+        print(f"   Started: {progress.get('start_time', 'unknown')}")
+        print()
+
     # Filter files
-    files_to_process = filter_files(inventory, exclusions, args)
-    
+    files_to_process = filter_files(inventory, exclusions, args, progress)
+
     # Print summary
     print_summary(files_to_process, exclusions)
-    
+
     # Confirm before processing
     if not args.test:
         response = input(f"Process {len(files_to_process)} files? (yes/no): ")
