@@ -186,3 +186,5 @@ doceater_data/
 exported_images/*
 test_images/*
 test_pdfs/*
+*.txt
+*.csv
