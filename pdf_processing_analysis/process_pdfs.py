@@ -251,7 +251,7 @@ def upload_pdf(filepath, progress):
                 f"{DOCLING_API_URL}/api/v1/documents/upload",
                 files=files,
                 headers=headers,
-                timeout=300  # 5 minute timeout
+                timeout=600  # 10 minute timeout (some PDFs are complex)
             )
             elapsed = time.time() - start_time
         

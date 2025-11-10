@@ -4,31 +4,61 @@
 
 ---
 
-## 📊 Your Analysis Results
+## Analysis Results
 
 **Total PDFs:** 1,464 files (5.68 GB)
 
 **Privacy Risk:**
 - **HIGH:** 25 files (1.7%) - Review required
-- **MEDIUM:** 95 files (6.5%) - Review recommended  
+- **MEDIUM:** 95 files (6.5%) - Review recommended
 - **SAFE:** 1,344 files (91.8%) - Ready to process
 
 ---
 
 ## Quick Start
 
+### 1. Analyze PDFs
 ```bash
-# 1. Run analysis
 ./analyze_pdfs.py
+```
 
-# 2. Review results
+### 2. Review & Exclude Sensitive Files
+```bash
+# Review analysis
 cat pdf_analysis_summary.txt
 
-# 3. Edit exclusion list (uncomment files to exclude)
+# Edit exclusion list (uncomment files to exclude)
 open pdf_exclusion_list.txt
+```
 
-# 4. Process PDFs (coming soon)
-./process_pdfs.py
+### 3. Process PDFs
+```bash
+# Check server is running
+./process_pdfs.py --check-server
+
+# Test with 5 files
+./process_pdfs.py --test --limit 5
+./process_pdfs.py --limit 5
+
+# Validate uploads
+./process_pdfs.py --validate
+
+# Process by size (recommended)
+./process_pdfs.py --batch tiny      # 645 files, ~20 min
+./process_pdfs.py --batch small     # 302 files, ~20 min
+./process_pdfs.py --batch medium    # 313 files, ~60 min
+./process_pdfs.py --batch large     # 66 files, ~75 min
+./process_pdfs.py --batch huge      # 19 files, ~90 min
+
+# Or process everything
+./process_pdfs.py --all             # All 1,345 files, 3-6 hours
+```
+
+### 4. Resume After Interruption
+```bash
+# If interrupted (Ctrl+C or connection lost)
+./process_pdfs.py --validate        # Check what was uploaded
+./process_pdfs.py --batch medium --resume  # Continue from where you left off
 ```
 
 ---
@@ -37,12 +67,19 @@ open pdf_exclusion_list.txt
 
 ### Scripts
 - **`analyze_pdfs.py`** - Scan PDFs and assess privacy risk
+- **`process_pdfs.py`** - Upload PDFs to DocEater with progress tracking
 
 ### Generated Files
-- **`pdf_inventory.csv`** - Complete list with risk scores (open in Excel)
+- **`pdf_inventory.csv`** - Complete list with risk scores (1,464 files)
 - **`pdf_analysis_summary.txt`** - Statistical analysis
 - **`pdf_exclusion_list.txt`** - Files to exclude (edit this!)
+- **`files_to_process.json`** - Final list of 1,345 files to process
+- **`processing_progress.json`** - Real-time progress tracking (created during processing)
+- **`processing_errors.log`** - Error details (created if errors occur)
+
+### Documentation
 - **`COMPARISON_REPORT.md`** - Comparison with Gemini's analysis
+- **`PROCESSING_PLAN.md`** - Detailed processing guide
 
 ---
 
@@ -52,7 +89,7 @@ open pdf_exclusion_list.txt
 
 **Risk Scoring:**
 - Keyword match: +10 points
-- Filename pattern: +5 points  
+- Filename pattern: +5 points
 - Sensitive directory: +15 points
 
 **Risk Levels:**
@@ -65,27 +102,75 @@ open pdf_exclusion_list.txt
 
 ## What to Exclude
 
-**Definitely exclude:**
+**Definitely exclude (120 files):**
 - PayStubs (20 files)
 - Passport scans
 - Immigration docs (EAD, I-20, I-94, I-140, DS-2019)
 - Insurance documents
-- Transcripts
+- Transcripts (4 files)
 - Resumes
 - Medical records
-- Utility bills
+- Utility bills (11 files)
 - Financial documents
+- Personal documents with your name
+- Travel confirmations
 
-**Safe to process:**
-- Academic papers
+**Safe to process (1,345 files):**
+- Academic papers (~1,200+ files)
 - Research papers
 - Technical documentation
 - Public reports
 
 ---
 
+## Progress Tracking
+
+### How It Works
+1. **Auto-save:** Progress saved after each successful upload
+2. **Resume:** Use `--resume` to skip already-processed files
+3. **Validate:** Use `--validate` to compare local progress with server state
+
+### Progress File
+`processing_progress.json` tracks:
+- Processed files (with paths)
+- Failed files (with error messages)
+- Start time and last update
+
+### Validation
+Catches silent failures by comparing local progress with actual server state:
+```bash
+./process_pdfs.py --validate
+```
+
+---
+
+## Common Commands
+
+```bash
+# Check server health
+./process_pdfs.py --check-server
+
+# Validate progress with server
+./process_pdfs.py --validate
+
+# Test mode (dry run)
+./process_pdfs.py --test --limit 5
+
+# Process specific batch
+./process_pdfs.py --batch tiny
+./process_pdfs.py --risk-level SAFE
+
+# Resume after interruption
+./process_pdfs.py --batch medium --resume
+
+# Process everything
+./process_pdfs.py --all
+```
+
+---
+
 ## More Info
 
-- **Full comparison with Gemini:** See `COMPARISON_REPORT.md`
+- **Detailed processing plan:** See `PROCESSING_PLAN.md`
+- **Comparison with Gemini:** See `COMPARISON_REPORT.md`
 - **Customization:** Edit `analyze_pdfs.py` to add keywords/patterns
-- **Re-run anytime:** `./analyze_pdfs.py` (backs up exclusion list first)
