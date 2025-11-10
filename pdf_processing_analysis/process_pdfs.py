@@ -57,13 +57,21 @@ if not API_KEY:
     print("❌ Error: No admin API key found in .env file")
     sys.exit(1)
 
+# Get Docling API URL from environment
+DOCLING_API_URL = os.getenv('DOCLING_API_URL')
+if not DOCLING_API_URL:
+    print("❌ Error: DOCLING_API_URL not found in .env file")
+    sys.exit(1)
+
 # Configuration
-DOCLING_API_URL = "http://192.222.54.152:8000"
 INVENTORY_FILE = "pdf_inventory.csv"
 EXCLUSION_FILE_MY = "pdf_exclusion_list.txt"
 EXCLUSION_FILE_GEMINI = "pdf_exclusion_list_gemini.txt"
-PROGRESS_FILE = "processing_progress.json"
-ERROR_LOG_FILE = "processing_errors.log"
+
+# Generate timestamped filenames for logs
+TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
+PROGRESS_FILE = f"processing_progress_{TIMESTAMP}.json"
+ERROR_LOG_FILE = f"processing_errors_{TIMESTAMP}.log"
 
 # Size categories (in MB)
 SIZE_CATEGORIES = {
@@ -148,35 +156,40 @@ def validate_server():
         response = requests.get(f"{DOCLING_API_URL}/api/v1/health", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            uptime = data.get('uptime_days', 'unknown')
-            return True, f"Server is healthy (uptime: {uptime} days)"
+            uptime_sec = data.get('uptime_seconds', 0)
+            uptime_days = uptime_sec / 86400
+            return True, f"Server is healthy (uptime: {uptime_days:.1f} days)"
         else:
             return False, f"Server returned status {response.status_code}"
     except Exception as e:
         return False, f"Cannot connect to server: {str(e)}"
 
 
-def get_server_documents():
-    """Get list of all documents from server."""
+def get_server_document_count():
+    """Get count of documents from server."""
     try:
         headers = {'X-API-Key': API_KEY}
         response = requests.get(
             f"{DOCLING_API_URL}/api/v1/documents",
             headers=headers,
-            timeout=30
+            params={'page': 1, 'page_size': 1},  # Just get first page with 1 item
+            timeout=10
         )
         if response.status_code == 200:
-            docs = response.json()
-            # API returns list directly, not wrapped in 'documents' key
-            if isinstance(docs, list):
-                return docs
-            return docs.get('documents', [])
+            data = response.json()
+            # If paginated response, get total count
+            if isinstance(data, dict) and 'total' in data:
+                return data['total']
+            # If list response, would need to fetch all (fallback)
+            elif isinstance(data, list):
+                return len(data)
+            return 0
         else:
             print(f"⚠️  Failed to get server documents: HTTP {response.status_code}")
-            return []
+            return None
     except Exception as e:
         print(f"⚠️  Failed to get server documents: {str(e)}")
-        return []
+        return None
 
 
 def validate_progress_with_server(progress):
@@ -185,52 +198,36 @@ def validate_progress_with_server(progress):
     print("VALIDATING PROGRESS WITH SERVER")
     print("="*80)
 
-    # Get server documents
-    server_docs = get_server_documents()
-    if not server_docs:
-        print("⚠️  Could not retrieve server documents for validation")
+    # Get server document count
+    server_count = get_server_document_count()
+    if server_count is None:
+        print("⚠️  Could not retrieve server document count")
         print("="*80 + "\n")
         return
 
-    # Extract filenames from server
-    server_filenames = set()
-    for doc in server_docs:
-        filename = doc.get('filename', '')
-        if filename:
-            server_filenames.add(filename)
+    local_processed_count = len(progress.get('processed', []))
 
-    print(f"📊 Server has {len(server_filenames)} documents")
-    print(f"📊 Local progress shows {len(progress.get('processed', []))} processed")
+    print(f"📊 Server has {server_count} documents")
+    print(f"📊 Local progress shows {local_processed_count} processed")
     print()
 
-    # Check for discrepancies
-    local_processed = progress.get('processed', [])
-    local_filenames = {os.path.basename(path) for path in local_processed}
+    if server_count == local_processed_count:
+        print("✅ Server and local counts match!")
+    elif server_count < local_processed_count:
+        print(f"⚠️  Server has {local_processed_count - server_count} fewer documents than local progress")
+        print("   Some uploads may have failed or server database was cleared")
+    else:
+        print(f"ℹ️  Server has {server_count - local_processed_count} more documents than local progress")
+        print("   These may have been uploaded manually or from another session")
+    print()
 
-    # Files in local progress but not on server
-    missing_on_server = local_filenames - server_filenames
-    if missing_on_server:
-        print(f"⚠️  {len(missing_on_server)} files in local progress but NOT on server:")
-        for filename in list(missing_on_server)[:10]:
-            print(f"   - {filename}")
-        if len(missing_on_server) > 10:
-            print(f"   ... and {len(missing_on_server) - 10} more")
-        print()
-
-    # Files on server but not in local progress
-    extra_on_server = server_filenames - local_filenames
-    if extra_on_server:
-        print(f"ℹ️  {len(extra_on_server)} files on server but NOT in local progress")
-        print(f"   (These may have been uploaded manually or from another session)")
-        print()
-
-    if not missing_on_server and not extra_on_server:
+    if server_count == local_processed_count:
         print("✅ Local progress matches server state perfectly!")
 
     print("="*80 + "\n")
 
 
-def upload_pdf(filepath, progress):
+def upload_pdf(filepath, progress, timeout=600):
     """Upload a single PDF to DocEater."""
     try:
         # Check if already processed
@@ -251,7 +248,7 @@ def upload_pdf(filepath, progress):
                 f"{DOCLING_API_URL}/api/v1/documents/upload",
                 files=files,
                 headers=headers,
-                timeout=600  # 10 minute timeout (some PDFs are complex)
+                timeout=timeout
             )
             elapsed = time.time() - start_time
         
@@ -375,6 +372,8 @@ def main():
     parser.add_argument('--resume', action='store_true', help='Resume from previous run')
     parser.add_argument('--validate', action='store_true', help='Validate progress with server and exit')
     parser.add_argument('--check-server', action='store_true', help='Check server health and exit')
+    parser.add_argument('--retry-failed', type=str, help='Retry files from a failed files list (path to file)')
+    parser.add_argument('--timeout', type=int, default=600, help='Upload timeout in seconds (default: 600)')
 
     args = parser.parse_args()
 
@@ -386,10 +385,9 @@ def main():
             print(f"✅ {msg}")
 
             # Also show server stats
-            docs = get_server_documents()
-            if docs:
-                total_size = sum(doc.get('size_bytes', 0) for doc in docs) / (1024*1024)
-                print(f"📊 Server has {len(docs)} documents ({total_size:.2f} MB)")
+            doc_count = get_server_document_count()
+            if doc_count is not None:
+                print(f"📊 Server has {doc_count} documents")
         else:
             print(f"❌ {msg}")
         return
@@ -399,12 +397,37 @@ def main():
         progress = load_progress()
         validate_progress_with_server(progress)
         return
-    
-    # Load data
-    print("Loading inventory and exclusions...")
-    inventory = load_inventory()
-    exclusions = load_exclusions()
-    progress = load_progress()
+
+    # Handle retry-failed mode
+    if args.retry_failed:
+        print(f"Loading failed files from {args.retry_failed}...")
+        with open(args.retry_failed, 'r') as f:
+            failed_paths = [line.strip() for line in f if line.strip()]
+
+        # Create inventory entries from failed files
+        inventory = []
+        for filepath in failed_paths:
+            if os.path.exists(filepath):
+                path = Path(filepath)
+                stat = path.stat()
+                inventory.append({
+                    'full_path': str(path),
+                    'filename': path.name,
+                    'size_mb': round(stat.st_size / (1024*1024), 2),
+                    'risk_level': 'UNKNOWN'
+                })
+            else:
+                print(f"⚠️  File not found: {filepath}")
+
+        print(f"Found {len(inventory)} files to retry")
+        exclusions = set()
+        progress = load_progress()
+    else:
+        # Load data normally
+        print("Loading inventory and exclusions...")
+        inventory = load_inventory()
+        exclusions = load_exclusions()
+        progress = load_progress()
 
     # Validate server is accessible (unless in test mode)
     if not args.test:
@@ -467,7 +490,7 @@ def main():
             print(f"  🧪 TEST MODE - Would upload to {DOCLING_API_URL}")
             result = 'test'
         else:
-            result = upload_pdf(filepath, progress)
+            result = upload_pdf(filepath, progress, timeout=args.timeout)
         
         if result == 'success':
             success_count += 1
