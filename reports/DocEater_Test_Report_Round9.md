@@ -2,7 +2,7 @@
 
 **Date:** November 2, 2025
 **Tester:** Claude Code
-**API Base:** http://192.222.54.152:8000/
+**API Base:** [REDACTED]
 **Previous Round:** Round 8 (Major issues fixed)
 
 ---

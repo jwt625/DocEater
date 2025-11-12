@@ -10,7 +10,7 @@ env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 # API Configuration
-API_BASE_URL = os.getenv("DOCEATER_UI_API_URL", "http://192.222.54.152:8000")
+API_BASE_URL = os.getenv("DOCEATER_UI_API_URL", "http://localhost:8000")
 
 # Extract admin API key from DOCEATER_API_KEYS
 api_keys_str = os.getenv("DOCEATER_API_KEYS", "")

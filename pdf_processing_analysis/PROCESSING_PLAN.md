@@ -238,7 +238,7 @@ The script automatically tracks:
 
 ### After Processing
 
-- Verify files in DocEater: http://192.222.54.152:8000/docs
+- Verify files in DocEater: http://YOUR_SERVER_IP:8000/docs
 - Test search functionality
 - Review failed files in `processing_errors.log`
 - Retry failed files if needed
