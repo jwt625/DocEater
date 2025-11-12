@@ -181,7 +181,7 @@ def get_health() -> str:
 # Build Gradio Interface
 with gr.Blocks(title="DocEater", theme=gr.themes.Soft()) as app:
     gr.Markdown("# 🍽️ DocEater - Document Search & Management")
-    gr.Markdown(f"Connected to: `{API_BASE_URL}`")
+    gr.Markdown("**Status:** Connected")
     
     with gr.Tabs():
         # Search Tab

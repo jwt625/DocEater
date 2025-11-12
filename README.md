@@ -5,6 +5,7 @@ Production-ready document processing system with REST API and background file mo
 ## Features
 
 - **REST API** - FastAPI server for document management
+- **Web UI** - Gradio-based interface for search and document management
 - **Authentication** - JWT and API key support
 - **File Monitoring** - Automatic folder watching for new documents
 - **Document Processing** - Markdown conversion with formula enrichment
@@ -55,6 +56,20 @@ API documentation: http://localhost:8000/docs
 
 ## Usage
 
+### Web UI
+```bash
+# Launch web interface
+uv run doceat ui
+
+# Custom host/port
+uv run doceat ui --host 0.0.0.0 --port 7860
+
+# Create public share link
+uv run doceat ui --share
+```
+
+Default URL: http://127.0.0.1:7860
+
 ### API Server
 ```bash
 # Development
@@ -102,8 +117,8 @@ uv run doceat images export --document-id <id> --output ./images
 - `GET /api/v1/stats` - Statistics (authenticated)
 - `GET /api/v1/images/{id}` - Serve images
 
-### Search (Planned)
-- `POST /api/v1/search` - Semantic search
+### Search
+- `POST /api/v1/search` - Semantic search with text and image embeddings
 
 ## Configuration
 
@@ -146,14 +161,15 @@ uv run pytest --cov=src/doceater
 
 **Production Ready:**
 - REST API with authentication
+- Web UI for search and document management
 - Document upload and processing
 - Image extraction
+- Semantic search with Jina CLIP embeddings
 - 83% test coverage (162 tests)
 
 **In Development:**
-- Semantic search with Jina CLIP embeddings
 - Background processing pipeline
-- Web UI
+- Advanced search filters
 
 ## License
 
