@@ -46,6 +46,9 @@ dependencies = [
     "einops>=0.8.0",
     "timm>=1.0.0",
     "pyjwt>=2.8.0",
+    # Web UI
+    "gradio>=4.0.0",
+    "httpx>=0.25.0",
 ]
 
 

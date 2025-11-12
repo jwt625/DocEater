@@ -589,6 +589,29 @@ def images(
     asyncio.run(_images())
 
 
+@app.command()
+def ui(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
+    port: int = typer.Option(7860, "--port", "-p", help="Port to bind to"),
+    share: bool = typer.Option(False, "--share", help="Create public share link"),
+) -> None:
+    """Launch the Gradio web UI."""
+    try:
+        from .ui.app import launch
+
+        console.print(f"🚀 Starting DocEater Web UI on http://{host}:{port}")
+        launch(host=host, port=port, share=share)
+    except ImportError as e:
+        console.print(f"❌ Failed to import UI module: {e}")
+        console.print("💡 Make sure gradio is installed: uv pip install gradio")
+        raise typer.Exit(1) from e
+    except KeyboardInterrupt:
+        console.print("\n🛑 UI stopped by user")
+    except Exception as e:
+        console.print(f"❌ Failed to start UI: {e}")
+        raise typer.Exit(1) from e
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     app()
