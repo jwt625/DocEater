@@ -61,6 +61,15 @@ open pdf_exclusion_list.txt
 ./process_pdfs.py --batch medium --resume  # Continue from where you left off
 ```
 
+### 5. Retry Failed Files
+```bash
+# Extract failed files from progress JSON
+jq '.failed[].path' processing_progress.json > failed_files.txt
+
+# Retry failed files
+./process_pdfs.py --retry-failed failed_files.txt --timeout 1800
+```
+
 ---
 
 ## Files
